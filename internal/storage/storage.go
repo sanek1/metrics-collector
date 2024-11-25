@@ -22,16 +22,16 @@ func NewMemStorage() *MemStorage {
 	}
 }
 
-func (m *MemStorage) SetCounter(key string, counter int64) {
-	if metric, ok := m.Metrics[key]; ok {
-		m.Metrics[key] = Metric{Name: key, Counter: metric.Counter + counter}
+func (ms *MemStorage) SetCounter(key string, counter int64) {
+	if metric, ok := ms.Metrics[key]; ok {
+		ms.Metrics[key] = Metric{Name: key, Counter: metric.Counter + counter}
 	} else {
-		m.Metrics[key] = Metric{Name: key, Counter: counter}
+		ms.Metrics[key] = Metric{Name: key, Counter: counter}
 	}
 }
 
-func (m *MemStorage) SetGauge(key string, value float64) {
-	m.Metrics[key] = Metric{Name: key, Gauge: value}
+func (ms *MemStorage) SetGauge(key string, value float64) {
+	ms.Metrics[key] = Metric{Name: key, Gauge: value}
 }
 
 func StrToGauge(input string) (float64, error) {

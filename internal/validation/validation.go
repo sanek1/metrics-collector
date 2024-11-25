@@ -7,6 +7,7 @@ import (
 )
 
 const (
+	typeMethod = 1
 	typeMetric = 2
 	metricName = 3
 	metricVal  = 4
@@ -32,6 +33,14 @@ func Validation(next http.Handler) func(http.ResponseWriter, *http.Request) {
 			message = "invalid path"
 			printValidationMessage(message)
 			http.Error(rw, message, http.StatusNotFound)
+			return
+		}
+
+		// check correct name metrick
+		if splitedPath[typeMethod] != "update" {
+			message = "invalid type method name"
+			printValidationMessage(message)
+			http.Error(rw, message, http.StatusBadRequest)
 			return
 		}
 

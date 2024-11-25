@@ -35,7 +35,7 @@ func initRouting(ms h.MetricStorage) *http.ServeMux {
 	gaugeHandler := http.HandlerFunc(ms.GaugeHandler)
 	counterHandler := http.HandlerFunc(ms.CounterHandler)
 
-	mux.HandleFunc(`/`, mainPage)
+	mux.HandleFunc(`/`, v.Validation(mainPage))
 	mux.HandleFunc(`/update/gauge/`, v.Validation(gaugeHandler))
 	mux.HandleFunc(`/update/counter/`, v.Validation(counterHandler))
 	return mux
