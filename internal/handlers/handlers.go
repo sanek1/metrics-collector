@@ -1,49 +1,53 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/sanek1/metrics-collector/internal/storage"
+)
+
+const (
+	metricName = 3
+	metricVal  = 4
+	minPathLen = 5
 )
 
 type MetricStorage struct {
 	Storage storage.IMetricStorage
 }
 
-func MainPage(res http.ResponseWriter, req *http.Request) {
+func MainPage(rw http.ResponseWriter, req *http.Request) {
 	data := []byte(" ---------   Main Page ---------")
-	res.Write(data)
+	rw.Write(data)
+
 }
-func (ms MetricStorage) GetHandler(res http.ResponseWriter, r *http.Request) {
+func (ms MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
+	if metricKey, metricValue, err := readingDataFromURL(rw, r); err == nil {
+		ms.Storage.SetGauge(metricKey, metricValue)
+		rw.WriteHeader(http.StatusOK)
+	} else {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+	}
+}
 
-	//ms.Storage.GetGauge("test")
-
-	if r.Method != http.MethodPost {
-		res.WriteHeader(http.StatusMethodNotAllowed)
+func (ms MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request) {
+	key, val, err := readingDataFromURL(rw, r)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	body := fmt.Sprintf("Method: %s\r\n", r.Method)
-	body += "header =========\r\n"
-	for k, v := range r.Header {
-		body += fmt.Sprintf("%s: %v\r\n", k, v)
-	}
-
-	body += "query params ===========================\r\n"
-	for k, v := range r.URL.Query() {
-		body += fmt.Sprintf("%s: %v\r\n", k, v)
-	}
-
-	// return answer
-	body += "close ===========================\r\n"
-	res.Write([]byte(body))
+	ms.Storage.SetCounter(key, int64(val))
+	rw.WriteHeader(http.StatusOK)
 }
 
-func MiddleWare(next http.Handler) func(http.ResponseWriter, *http.Request) {
-	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-		fmt.Println("Before")
-		next.ServeHTTP(res, req)
-		fmt.Println("After")
-	})
+func readingDataFromURL(rw http.ResponseWriter, r *http.Request) (key string, value float64, err error) {
+	splitedPath := strings.Split(r.URL.Path, "/")
+	metricKey := splitedPath[metricName]
+	metricValue, err := storage.StrToGauge(splitedPath[metricVal])
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+		return
+	}
+	return metricKey, metricValue, nil
 }
