@@ -9,11 +9,6 @@ import (
 	v "github.com/sanek1/metrics-collector/internal/validation"
 )
 
-const (
-	address = "localhost"
-	port    = "8080"
-)
-
 func main() {
 	handlersStorage := h.MetricStorage{
 		Storage: s.NewMemStorage(),
@@ -21,7 +16,7 @@ func main() {
 
 	mux := initRouting(handlersStorage)
 	srv := &http.Server{
-		Addr:    net.JoinHostPort(address, port),
+		Addr:    net.JoinHostPort(s.Address, s.Port),
 		Handler: mux,
 	}
 	if err := srv.ListenAndServe(); err != nil {

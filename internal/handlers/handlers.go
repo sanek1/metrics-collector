@@ -13,8 +13,13 @@ const (
 	minPathLen = 5
 )
 
+type IMetricStorage interface {
+	SetGauge(key string, value float64)
+	SetCounter(key string, value int64)
+}
+
 type MetricStorage struct {
-	Storage storage.IMetricStorage
+	Storage IMetricStorage
 }
 
 func MainPage(rw http.ResponseWriter, req *http.Request) {
