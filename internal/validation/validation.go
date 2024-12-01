@@ -14,14 +14,6 @@ func Validation(next http.Handler) func(http.ResponseWriter, *http.Request) {
 		printValidationMessage(message)
 		rw.Header().Set("Content-Type", "application/json")
 
-		// check type of request
-		if r.Method != http.MethodPost {
-			message = "The specified address accepts only POST"
-			printValidationMessage(message)
-			http.Error(rw, message, http.StatusNotFound)
-			return
-		}
-
 		// check path
 		splitedPath := strings.Split(r.URL.Path, "/")
 		if len(splitedPath) < c.MinPathLen {

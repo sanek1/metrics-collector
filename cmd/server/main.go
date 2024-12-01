@@ -40,12 +40,7 @@ func InitRouting(ms h.MetricStorage) http.Handler {
 	r.Use(middleware.Logger)
 	r.Get("/*", http.HandlerFunc(ms.MainPageHandler))
 
-	r.Get("/{value}/{type}/*", v.Validation(http.HandlerFunc(ms.GetMetricsByNameHandler)))
-
-	//r.Route("/{value}/{type}", func(r chi.Router) {
-	//r.Get("/*", http.HandlerFunc(ms.GetMetricsByNameHandler))
-	//r.Get("/{counter}", http.HandlerFunc(ms.GetMetricsByNameHandler))
-	//})
+	r.Get("/{value}/{type}/*", http.HandlerFunc(ms.GetMetricsByNameHandler))
 
 	r.Route("/update", func(r chi.Router) {
 		r.Post("/*", v.Validation(http.HandlerFunc(h.BadRequestHandler)))
@@ -53,6 +48,6 @@ func InitRouting(ms h.MetricStorage) http.Handler {
 		r.Post("/counter/*", v.Validation(http.HandlerFunc(ms.CounterHandler)))
 	})
 	r.Post("/*", v.Validation(http.HandlerFunc(h.NotImplementedHandler)))
-	r.Get("/*", v.Validation(http.HandlerFunc(h.NotImplementedHandler)))
+	r.Get("/*", http.HandlerFunc(h.NotImplementedHandler))
 	return r
 }
