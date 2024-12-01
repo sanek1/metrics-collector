@@ -28,7 +28,7 @@ func Validation(next http.Handler) func(http.ResponseWriter, *http.Request) {
 			message = "invalid path"
 
 			printValidationMessage(message)
-			http.Error(rw, message, http.StatusBadRequest)
+			http.Error(rw, message, http.StatusNotFound)
 			return
 		}
 

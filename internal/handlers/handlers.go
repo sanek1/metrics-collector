@@ -25,6 +25,10 @@ func NotImplementedHandler(rw http.ResponseWriter, r *http.Request) {
 	http.Error(rw, "Not Implemented", http.StatusNotImplemented)
 }
 
+func BadRequestHandler(rw http.ResponseWriter, r *http.Request) {
+	http.Error(rw, "Bad Request Handler", http.StatusBadRequest)
+}
+
 func (ms MetricStorage) MainPageHandler(rw http.ResponseWriter, r *http.Request) {
 	res := ms.Storage.GetAllMetrics()
 
