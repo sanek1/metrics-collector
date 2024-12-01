@@ -48,8 +48,7 @@ func InitRouting(ms h.MetricStorage) http.Handler {
 		r.Post("/gauge/*", v.Validation(http.HandlerFunc(ms.GaugeHandler)))
 		r.Post("/counter/*", v.Validation(http.HandlerFunc(ms.CounterHandler)))
 	})
-	//update.Post("/gauge/*", v.Validation(http.HandlerFunc(ms.GaugeHandler)))
-	//update.Post("/counter/*", v.Validation(http.HandlerFunc(ms.CounterHandler)))
-	//r.Mount("/update", update)
+	r.Post("/*", h.NotImplementedHandler)
+	r.Get("/*", h.NotImplementedHandler)
 	return r
 }

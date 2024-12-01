@@ -52,6 +52,7 @@ func TestRouter(t *testing.T) {
 	}
 	for _, v := range testTable {
 		resp, post := testRequest(t, ts, "POST", v.url)
+		defer resp.Body.Close()
 		assert.Equal(t, v.status, resp.StatusCode)
 		if isValidJSON(v.want) {
 			assert.JSONEq(t, v.want, post)

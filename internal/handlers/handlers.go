@@ -21,6 +21,10 @@ type MetricStorage struct {
 	Storage IMetricStorage
 }
 
+func NotImplementedHandler(rw http.ResponseWriter, r *http.Request) {
+	http.Error(rw, "Not Implemented", http.StatusNotImplemented)
+}
+
 func (ms MetricStorage) MainPageHandler(rw http.ResponseWriter, r *http.Request) {
 	res := ms.Storage.GetAllMetrics()
 
