@@ -5,20 +5,18 @@ import (
 	"io"
 	"log"
 	"math/rand/v2"
-	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"os"
 	"runtime"
 	"time"
-
-	c "github.com/sanek1/metrics-collector/internal/config"
 )
 
 type gauge float64
 type counter int64
 
 func main() {
+	ParseFlags()
 	if err := run(); err != nil {
 		log.Fatal(err)
 	}
@@ -29,20 +27,13 @@ func run() error {
 	logger := log.New(os.Stdout, "Agent\t", log.Ldate|log.Ltime)
 	logger.Println("started")
 
-	pollTick := time.NewTicker(c.PollInterval)
-	reportTick := time.NewTicker(c.ReportInterval)
+	//pollTick := time.NewTicker(Options.pollInterval * time.Second)
+	pollTick := time.NewTicker(time.Duration(Options.pollInterval) * time.Second)
+	reportTick := time.NewTicker(time.Duration(Options.reportInterval) * time.Second)
 	defer func() {
 		pollTick.Stop()
 		reportTick.Stop()
 	}()
-
-	//client2 := resty.New()
-	//_, err := client.R().
-	//	//SetError(&responseErr).
-	//jar(initCookies(logger))
-	//SetResult(&users).
-	//	Cookies(initCookies(logger))
-	//	Get("")
 
 	client := &http.Client{
 		Jar: initCookies(logger),
@@ -71,7 +62,7 @@ func initCookies(logger *log.Logger) *cookiejar.Jar {
 }
 
 func reportMetrics(metrics map[string]gauge, PollCount counter, client *http.Client, logger *log.Logger) {
-	addr := net.JoinHostPort(c.Address, c.Port)
+	addr := Options.flagRunAddr
 
 	metricURL := fmt.Sprint("http://", addr, "/update/counter/PollCount/", PollCount)
 	if err := reportClient(client, metricURL, logger); err != nil {
