@@ -83,7 +83,7 @@ func (ms *MemStorage) GetMetrics(key, metricName, metricValue string) string {
 }
 
 func (m Metric) GaugeStr() string {
-	return fmt.Sprintf("%.2f", m.Gauge)
+	return fmt.Sprint(m.Gauge)
 }
 
 func (m Metric) CounterStr() string {

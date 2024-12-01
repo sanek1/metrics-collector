@@ -44,25 +44,14 @@ func (ms MetricStorage) MainPageHandler(rw http.ResponseWriter, r *http.Request)
 }
 
 func (ms MetricStorage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.Request) {
-
 	typeMetric := chi.URLParam(r, "type")
 	value := chi.URLParam(r, "value")
+	nameMetric := chi.URLParam(r, "*")
 
-	nameMetric := ""
-	if typeMetric == "gauge" {
-		nameMetric = chi.URLParam(r, c.Gauge)
-	} else {
-		nameMetric = chi.URLParam(r, c.Counter)
-	}
 	res := ms.Storage.GetMetrics(typeMetric, nameMetric, value)
 
-	rw.WriteHeader(http.StatusOK)
+	rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	rw.Write([]byte(res))
-
-	//rw.Header().Set("Content-Type", "application/json")
-	//json.NewEncoder(rw).Encode(struct {
-	//	Value string `json:"value"`
-	//}{res})
 }
 
 func (ms MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {

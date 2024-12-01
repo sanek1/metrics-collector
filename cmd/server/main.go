@@ -40,8 +40,8 @@ func InitRouting(ms h.MetricStorage) http.Handler {
 	r.Use(middleware.Logger)
 	r.Get("/*", http.HandlerFunc(ms.MainPageHandler))
 	r.Route("/{value}/{type}", func(r chi.Router) {
-		r.Get("/{gauge}", http.HandlerFunc(ms.GetMetricsByNameHandler))
-		r.Get("/{counter}", http.HandlerFunc(ms.GetMetricsByNameHandler))
+		r.Get("/*", http.HandlerFunc(ms.GetMetricsByNameHandler))
+		//r.Get("/{counter}", http.HandlerFunc(ms.GetMetricsByNameHandler))
 	})
 
 	r.Route("/update", func(r chi.Router) {
