@@ -7,12 +7,12 @@ import (
 	"math/rand/v2"
 	"net"
 	"net/http"
+	"net/http/cookiejar"
 	"os"
 	"runtime"
 	"time"
 
 	c "github.com/sanek1/metrics-collector/internal/config"
-	s "github.com/sanek1/metrics-collector/internal/storage"
 )
 
 type gauge float64
@@ -36,7 +36,18 @@ func run() error {
 		reportTick.Stop()
 	}()
 
-	httpClient := &http.Client{}
+	//client2 := resty.New()
+	//_, err := client.R().
+	//	//SetError(&responseErr).
+	//jar(initCookies(logger))
+	//SetResult(&users).
+	//	Cookies(initCookies(logger))
+	//	Get("")
+
+	client := &http.Client{
+		Jar: initCookies(logger),
+	}
+
 	PollCount := counter(0)
 	metrics := make(map[string]gauge, 30)
 	for {
@@ -45,13 +56,22 @@ func run() error {
 			PollCount++
 			pollMetrics(metrics)
 		case <-reportTick.C:
-			reportMetrics(metrics, PollCount, httpClient, logger)
+			reportMetrics(metrics, PollCount, client, logger)
 		}
 	}
 }
 
+func initCookies(logger *log.Logger) *cookiejar.Jar {
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		logger.Printf("failed to create cookies jar: %v", err)
+		return nil
+	}
+	return jar
+}
+
 func reportMetrics(metrics map[string]gauge, PollCount counter, client *http.Client, logger *log.Logger) {
-	addr := net.JoinHostPort(s.Address, s.Port)
+	addr := net.JoinHostPort(c.Address, c.Port)
 
 	metricURL := fmt.Sprint("http://", addr, "/update/counter/PollCount/", PollCount)
 	if err := reportClient(client, metricURL, logger); err != nil {
@@ -75,13 +95,24 @@ func reportClient(client *http.Client, url string, logger *log.Logger) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "text/plain")
+	//req.Header.Set("Content-Type", "application/json; charset=UTF-8") // для json
+	cookie := &http.Cookie{
+		Name:   "Token",
+		Value:  "TEST_TOKEN",
+		MaxAge: 360,
+	}
+	req.AddCookie(cookie)
+
 	resp, err := client.Do(req)
 	if err != nil {
 		logger.Printf("Error sending request: %v", err)
 		return err
 	}
+	io.Copy(os.Stdout, resp.Body)
 	fmt.Fprintf(os.Stdout, " Url: %s status: %d\n", url, resp.StatusCode)
+
 	defer resp.Body.Close()
+
 	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
 		logger.Printf("Error discarding response body: %v", err)
 	}
@@ -119,9 +150,5 @@ func pollMetrics(metrics map[string]gauge) {
 	metrics["StackSys"] = gauge(rtm.StackSys)
 	metrics["Sys"] = gauge(rtm.Sys)
 	metrics["TotalAlloc"] = gauge(rtm.TotalAlloc)
-
-	//
 	metrics["RandomValue"] = gauge(rand.Float64())
-	//metrics["PollCount"] = counter(rand.Int64())
-
 }
