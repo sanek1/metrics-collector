@@ -14,7 +14,7 @@ type IMetricStorage interface {
 	SetGauge(key string, value float64) string
 	SetCounter(key string, value float64) string
 	GetAllMetrics() []string
-	GetMetrics(metricType, metricName, metricValue string) string
+	GetMetrics(metricType, metricName string) (string, bool)
 }
 
 type MetricStorage struct {
@@ -45,13 +45,14 @@ func (ms MetricStorage) MainPageHandler(rw http.ResponseWriter, r *http.Request)
 
 func (ms MetricStorage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.Request) {
 	typeMetric := chi.URLParam(r, "type")
-	value := chi.URLParam(r, "value")
 	nameMetric := chi.URLParam(r, "*")
 
-	res := ms.Storage.GetMetrics(typeMetric, nameMetric, value)
-
-	rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	rw.Write([]byte(res))
+	if res, ok := ms.Storage.GetMetrics(typeMetric, nameMetric); ok {
+		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		rw.Write([]byte(res))
+		return
+	}
+	http.Error(rw, "No such value exists", http.StatusNotFound)
 }
 
 func (ms MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
