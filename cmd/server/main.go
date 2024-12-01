@@ -45,6 +45,7 @@ func InitRouting(ms h.MetricStorage) http.Handler {
 	})
 
 	r.Route("/update", func(r chi.Router) {
+		r.Post("/*", h.BadRequestHandler)
 		r.Post("/gauge/*", v.Validation(http.HandlerFunc(ms.GaugeHandler)))
 		r.Post("/counter/*", v.Validation(http.HandlerFunc(ms.CounterHandler)))
 	})
