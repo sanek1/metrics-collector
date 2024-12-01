@@ -22,7 +22,7 @@ type MetricStorage struct {
 }
 
 func NotImplementedHandler(rw http.ResponseWriter, r *http.Request) {
-	http.Error(rw, "Not Implemented", http.StatusNotImplemented)
+	http.Error(rw, "Not Implemented", http.StatusBadRequest)
 }
 
 func BadRequestHandler(rw http.ResponseWriter, r *http.Request) {

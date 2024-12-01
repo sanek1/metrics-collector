@@ -39,17 +39,20 @@ func InitRouting(ms h.MetricStorage) http.Handler {
 	///update := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Get("/*", http.HandlerFunc(ms.MainPageHandler))
-	r.Route("/{value}/{type}", func(r chi.Router) {
-		r.Get("/*", http.HandlerFunc(ms.GetMetricsByNameHandler))
-		//r.Get("/{counter}", http.HandlerFunc(ms.GetMetricsByNameHandler))
-	})
+
+	r.Get("/{value}/{type}/*", v.Validation(http.HandlerFunc(ms.GetMetricsByNameHandler)))
+
+	//r.Route("/{value}/{type}", func(r chi.Router) {
+	//r.Get("/*", http.HandlerFunc(ms.GetMetricsByNameHandler))
+	//r.Get("/{counter}", http.HandlerFunc(ms.GetMetricsByNameHandler))
+	//})
 
 	r.Route("/update", func(r chi.Router) {
-		r.Post("/*", h.BadRequestHandler)
+		r.Post("/*", v.Validation(http.HandlerFunc(h.BadRequestHandler)))
 		r.Post("/gauge/*", v.Validation(http.HandlerFunc(ms.GaugeHandler)))
 		r.Post("/counter/*", v.Validation(http.HandlerFunc(ms.CounterHandler)))
 	})
-	r.Post("/*", h.NotImplementedHandler)
-	r.Get("/*", h.NotImplementedHandler)
+	r.Post("/*", v.Validation(http.HandlerFunc(h.NotImplementedHandler)))
+	r.Get("/*", v.Validation(http.HandlerFunc(h.NotImplementedHandler)))
 	return r
 }

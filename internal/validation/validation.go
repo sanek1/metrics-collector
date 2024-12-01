@@ -18,7 +18,7 @@ func Validation(next http.Handler) func(http.ResponseWriter, *http.Request) {
 		if r.Method != http.MethodPost {
 			message = "The specified address accepts only POST"
 			printValidationMessage(message)
-			http.Error(rw, message, http.StatusMethodNotAllowed)
+			http.Error(rw, message, http.StatusNotFound)
 			return
 		}
 
