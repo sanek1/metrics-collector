@@ -47,7 +47,7 @@ func TestRouter(t *testing.T) {
 		{"/update/gauge/Alloc/777", `{"value":"Metric Name: Alloc, Metric Value:777"}`, http.StatusOK},
 		//bad response
 		{"/update/unknown/Mallocs/7", "Bad Request Handler\n", http.StatusBadRequest},
-		{"/update1/counter/Mallocs/7", "404 page not found\n", http.StatusNotFound},
+		{"/update1/counter/Mallocs/7", "Not Implemented\n", http.StatusBadRequest},
 		{"/update/gauge/Alloc/77.7.", "The value does not match the expected type.\n", http.StatusBadRequest},
 	}
 	for _, v := range testTable {
