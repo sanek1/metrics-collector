@@ -64,19 +64,19 @@ func (ms *MemStorage) GetAllMetrics() []string {
 }
 
 func (ms *MemStorage) GetMetrics(key, metricName, metricValue string) string {
-	metric, ok := ms.Metrics[key]
+	metric, ok := ms.Metrics[metricName]
 	if !ok {
 		return "Not Exists"
 	}
 
-	switch metricName {
+	switch key {
 	case c.Gauge:
 		if metric.GaugeStr() == metricValue {
-			return "Gauge: " + metric.GaugeStr()
+			return metric.GaugeStr()
 		}
 	case c.Counter:
 		if metric.CounterStr() == metricValue {
-			return "Counter: " + metric.CounterStr()
+			return metric.CounterStr()
 		}
 	}
 	return "Not Found"
