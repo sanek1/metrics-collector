@@ -70,14 +70,10 @@ func (ms *MemStorage) GetMetrics(key, metricName, metricValue string) string {
 	}
 
 	switch key {
-	case c.Gauge:
-		if metric.GaugeStr() == metricValue {
-			return metric.GaugeStr()
-		}
-	case c.Counter:
-		if metric.CounterStr() == metricValue {
-			return metric.CounterStr()
-		}
+	case "gauge":
+		return metric.GaugeStr()
+	case "counter":
+		return metric.CounterStr()
 	}
 	return "Not Found"
 }
