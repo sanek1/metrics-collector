@@ -99,7 +99,12 @@ func reportClient(client *http.Client, url string, logger *log.Logger) error {
 		logger.Printf("Error sending request: %v", err)
 		return err
 	}
-	io.Copy(os.Stdout, resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logger.Printf("Error reading response body: %v", err)
+		return err
+	}
+	os.Stdout.Write(body)
 	fmt.Fprintf(os.Stdout, " Url: %s status: %d\n", url, resp.StatusCode)
 
 	defer resp.Body.Close()

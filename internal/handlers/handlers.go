@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 
@@ -40,7 +41,11 @@ func (ms MetricStorage) MainPageHandler(rw http.ResponseWriter, r *http.Request)
 
 	rw.Header().Set("Content-Type", "text/html")
 	rw.WriteHeader(http.StatusOK)
-	rw.Write([]byte(data))
+	_, err := rw.Write([]byte(data))
+	if err != nil {
+		// log error
+		log.Printf("Error writing response: %v", err)
+	}
 }
 
 func (ms MetricStorage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.Request) {
@@ -49,7 +54,10 @@ func (ms MetricStorage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.
 
 	if res, ok := ms.Storage.GetMetrics(typeMetric, nameMetric); ok {
 		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		rw.Write([]byte(res))
+		_, err := rw.Write([]byte(res))
+		if err != nil {
+			log.Printf("Error writing response: %v", err)
+		}
 		return
 	}
 	http.Error(rw, "No such value exists", http.StatusNotFound)
@@ -65,9 +73,12 @@ func (ms MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.WriteHeader(http.StatusOK)
 
 	rw.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(rw).Encode(struct {
+	err = json.NewEncoder(rw).Encode(struct {
 		Value string `json:"value"`
 	}{ms.Storage.SetGauge(key, val)})
+	if err != nil {
+		log.Printf("Error writing response: %v", err)
+	}
 }
 
 func (ms MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request) {
@@ -79,9 +90,12 @@ func (ms MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request) 
 
 	rw.WriteHeader(http.StatusOK)
 	rw.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(rw).Encode(struct {
+	err = json.NewEncoder(rw).Encode(struct {
 		Value string `json:"value"`
 	}{ms.Storage.SetCounter(key, val)})
+	if err != nil {
+		log.Printf("Error writing response: %v", err)
+	}
 }
 
 func readingDataFromURL(r *http.Request) (key string, value float64, err error) {
