@@ -24,7 +24,6 @@ func ParseFlags() {
 		os.Exit(1)
 	}
 
-	// override flags with env vars
 	if addr := os.Getenv("ADDRESS"); addr != "" {
 		Options.flagRunAddr = addr
 	}

@@ -68,7 +68,6 @@ func (ms *MemStorage) GetMetrics(key, metricName string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-
 	switch key {
 	case "gauge":
 		return metric.GaugeStr(), true

@@ -6,7 +6,6 @@ import (
 	"log"
 	"math/rand/v2"
 	"net/http"
-	"net/http/cookiejar"
 	"os"
 	"runtime"
 	"time"
@@ -22,22 +21,17 @@ func main() {
 	}
 }
 
-// run starts agent
 func run() error {
 	logger := log.New(os.Stdout, "Agent\t", log.Ldate|log.Ltime)
 	logger.Println("started")
 
-	//pollTick := time.NewTicker(Options.pollInterval * time.Second)
 	pollTick := time.NewTicker(time.Duration(Options.pollInterval) * time.Second)
 	reportTick := time.NewTicker(time.Duration(Options.reportInterval) * time.Second)
 	defer func() {
 		pollTick.Stop()
 		reportTick.Stop()
 	}()
-
-	client := &http.Client{
-		Jar: initCookies(logger),
-	}
+	client := &http.Client{}
 
 	PollCount := counter(0)
 	metrics := make(map[string]gauge, 30)
@@ -50,15 +44,6 @@ func run() error {
 			reportMetrics(metrics, PollCount, client, logger)
 		}
 	}
-}
-
-func initCookies(logger *log.Logger) *cookiejar.Jar {
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		logger.Printf("failed to create cookies jar: %v", err)
-		return nil
-	}
-	return jar
 }
 
 func reportMetrics(metrics map[string]gauge, PollCount counter, client *http.Client, logger *log.Logger) {
@@ -86,7 +71,6 @@ func reportClient(client *http.Client, url string, logger *log.Logger) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "text/plain")
-	//req.Header.Set("Content-Type", "application/json; charset=UTF-8") // для json
 	cookie := &http.Cookie{
 		Name:   "Token",
 		Value:  "TEST_TOKEN",

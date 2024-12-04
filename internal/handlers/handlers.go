@@ -11,7 +11,7 @@ import (
 	"github.com/sanek1/metrics-collector/internal/storage"
 )
 
-type IMetricStorage interface {
+type metricStorager interface {
 	SetGauge(key string, value float64) string
 	SetCounter(key string, value float64) string
 	GetAllMetrics() []string
@@ -19,7 +19,7 @@ type IMetricStorage interface {
 }
 
 type MetricStorage struct {
-	Storage IMetricStorage
+	Storage metricStorager
 }
 
 func NotImplementedHandler(rw http.ResponseWriter, r *http.Request) {
@@ -43,7 +43,6 @@ func (ms MetricStorage) MainPageHandler(rw http.ResponseWriter, r *http.Request)
 	rw.WriteHeader(http.StatusOK)
 	_, err := rw.Write([]byte(data))
 	if err != nil {
-		// log error
 		log.Printf("Error writing response: %v", err)
 	}
 }
@@ -66,7 +65,6 @@ func (ms MetricStorage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.
 func (ms MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 	key, val, err := readingDataFromURL(r)
 	if err != nil {
-		// log error
 		http.Error(rw, "The value does not match the expected type.", http.StatusBadRequest)
 		return
 	}

@@ -1,12 +1,14 @@
 package config
 
 const (
-	TypeMethod = 1
-	TypeMetric = 2
-	MetricName = 3
-	MetricVal  = 4
-	MinPathLen = 5
+	TypeMethod = iota + 1
+	TypeMetric
+	MetricName
+	MetricVal
+	MinPathLen
+)
 
+const (
 	Gauge   = "gauge"
 	Counter = "counter"
 )

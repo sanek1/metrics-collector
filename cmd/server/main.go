@@ -4,12 +4,9 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
-
 	h "github.com/sanek1/metrics-collector/internal/handlers"
+	rc "github.com/sanek1/metrics-collector/internal/routingController"
 	s "github.com/sanek1/metrics-collector/internal/storage"
-	v "github.com/sanek1/metrics-collector/internal/validation"
 )
 
 func main() {
@@ -26,27 +23,8 @@ func RunServer() error {
 		Storage: memStorage,
 	}
 
-	r := InitRouting(metricStorage)
+	r := rc.InitRouting(metricStorage)
 	log.Println("Server start on ", Options.flagRunAddr)
 	log.Fatal(http.ListenAndServe(Options.flagRunAddr, r))
 	return nil
-}
-
-func InitRouting(ms h.MetricStorage) http.Handler {
-
-	r := chi.NewRouter()
-	///update := chi.NewRouter()
-	r.Use(middleware.Logger)
-	r.Get("/*", http.HandlerFunc(ms.MainPageHandler))
-
-	r.Get("/{value}/{type}/*", http.HandlerFunc(ms.GetMetricsByNameHandler))
-
-	r.Route("/update", func(r chi.Router) {
-		r.Post("/*", v.Validation(http.HandlerFunc(h.BadRequestHandler)))
-		r.Post("/gauge/*", v.Validation(http.HandlerFunc(ms.GaugeHandler)))
-		r.Post("/counter/*", v.Validation(http.HandlerFunc(ms.CounterHandler)))
-	})
-	r.Post("/*", v.Validation(http.HandlerFunc(h.NotImplementedHandler)))
-	r.Get("/*", http.HandlerFunc(h.NotImplementedHandler))
-	return r
 }

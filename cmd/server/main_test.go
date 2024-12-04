@@ -1,4 +1,3 @@
-// model_test.go
 package main
 
 import (
@@ -9,6 +8,7 @@ import (
 	"testing"
 
 	h "github.com/sanek1/metrics-collector/internal/handlers"
+	rc "github.com/sanek1/metrics-collector/internal/routingController"
 	s "github.com/sanek1/metrics-collector/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,7 +25,6 @@ func testRequest(t *testing.T, ts *httptest.Server, method,
 
 	respBody, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-
 	return resp, string(respBody)
 }
 
@@ -36,7 +35,7 @@ func TestRouter(t *testing.T) {
 		Storage: memStorage,
 	}
 
-	ts := httptest.NewServer(InitRouting(metricStorage))
+	ts := httptest.NewServer(rc.InitRouting(metricStorage))
 	defer ts.Close()
 	var testTable = []struct {
 		url    string
@@ -59,7 +58,6 @@ func TestRouter(t *testing.T) {
 		} else {
 			assert.Equal(t, v.want, post)
 		}
-
 	}
 }
 
