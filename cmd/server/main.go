@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	h "github.com/sanek1/metrics-collector/internal/handlers"
-	rc "github.com/sanek1/metrics-collector/internal/routingController"
+	rc "github.com/sanek1/metrics-collector/internal/routing"
 	s "github.com/sanek1/metrics-collector/internal/storage"
 )
 

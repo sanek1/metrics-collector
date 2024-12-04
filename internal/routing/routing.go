@@ -1,4 +1,4 @@
-package routingController
+package routing
 
 import (
 	"net/http"

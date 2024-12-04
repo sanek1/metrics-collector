@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	h "github.com/sanek1/metrics-collector/internal/handlers"
-	rc "github.com/sanek1/metrics-collector/internal/routingController"
+	rc "github.com/sanek1/metrics-collector/internal/routing"
 	s "github.com/sanek1/metrics-collector/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
