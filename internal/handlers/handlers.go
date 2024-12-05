@@ -11,37 +11,12 @@ import (
 	"github.com/sanek1/metrics-collector/internal/storage"
 )
 
-type metricStorager interface {
-	SetGauge(key string, value float64) string
-	SetCounter(key string, value float64) string
-	GetAllMetrics() []string
-	GetMetrics(metricType, metricName string) (string, bool)
-}
-
-type MetricStorage struct {
-	Storage metricStorager
-}
-
-func NotImplementedHandler(rw http.ResponseWriter, r *http.Request) {
-	http.Error(rw, "Not Implemented", http.StatusBadRequest)
-}
-
-func BadRequestHandler(rw http.ResponseWriter, r *http.Request) {
-	http.Error(rw, "Bad Request Handler", http.StatusBadRequest)
-}
-
 func (ms MetricStorage) MainPageHandler(rw http.ResponseWriter, r *http.Request) {
-	res := ms.Storage.GetAllMetrics()
-
-	data := `<html lang="ru"><head><meta charset="UTF-8"><title>Метрики</title></head><body><h1>Метрики</h1>`
-	for _, metric := range res {
-		data += `<p>` + metric + `</p>`
-	}
-	data += `</body></html>`
-
+	metrics := ms.Storage.GetAllMetrics()
+	htmlData := generateHTML(metrics)
 	rw.Header().Set("Content-Type", "text/html")
 	rw.WriteHeader(http.StatusOK)
-	_, err := rw.Write([]byte(data))
+	_, err := rw.Write([]byte(htmlData))
 	if err != nil {
 		log.Printf("Error writing response: %v", err)
 	}
@@ -51,10 +26,9 @@ func (ms MetricStorage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.
 	typeMetric := chi.URLParam(r, "type")
 	nameMetric := chi.URLParam(r, "*")
 
-	if res, ok := ms.Storage.GetMetrics(typeMetric, nameMetric); ok {
+	if m, ok := ms.Storage.GetMetrics(typeMetric, nameMetric); ok {
 		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		_, err := rw.Write([]byte(res))
-		if err != nil {
+		if _, err := rw.Write([]byte(m)); err != nil {
 			log.Printf("Error writing response: %v", err)
 		}
 		return
@@ -68,9 +42,10 @@ func (ms MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, "The value does not match the expected type.", http.StatusBadRequest)
 		return
 	}
-	rw.WriteHeader(http.StatusOK)
 
+	rw.WriteHeader(http.StatusOK)
 	rw.Header().Set("Content-Type", "application/json")
+
 	err = json.NewEncoder(rw).Encode(struct {
 		Value string `json:"value"`
 	}{ms.Storage.SetGauge(key, val)})
@@ -88,12 +63,30 @@ func (ms MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request) 
 
 	rw.WriteHeader(http.StatusOK)
 	rw.Header().Set("Content-Type", "application/json")
+
 	err = json.NewEncoder(rw).Encode(struct {
 		Value string `json:"value"`
 	}{ms.Storage.SetCounter(key, val)})
 	if err != nil {
 		log.Printf("Error writing response: %v", err)
 	}
+}
+
+func NotImplementedHandler(rw http.ResponseWriter, r *http.Request) {
+	http.Error(rw, "Not Implemented", http.StatusBadRequest)
+}
+
+func BadRequestHandler(rw http.ResponseWriter, r *http.Request) {
+	http.Error(rw, "Bad Request Handler", http.StatusBadRequest)
+}
+
+func generateHTML(metrics []string) string {
+	data := `<html lang="ru"><head><meta charset="UTF-8"><title>Метрики</title></head><body><h1>Метрики</h1>`
+	for _, metric := range metrics {
+		data += `<p>` + metric + `</p>`
+	}
+	data += `</body></html>`
+	return data
 }
 
 func readingDataFromURL(r *http.Request) (key string, value float64, err error) {

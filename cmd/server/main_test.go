@@ -30,7 +30,7 @@ func testRequest(t *testing.T, ts *httptest.Server, method,
 
 func TestRouter(t *testing.T) {
 
-	memStorage := s.NewMemStorage()
+	memStorage := s.NewMemoryStorage()
 	metricStorage := h.MetricStorage{
 		Storage: memStorage,
 	}
