@@ -10,6 +10,7 @@ import (
 	h "github.com/sanek1/metrics-collector/internal/handlers"
 	rc "github.com/sanek1/metrics-collector/internal/routing"
 	s "github.com/sanek1/metrics-collector/internal/storage"
+	v "github.com/sanek1/metrics-collector/internal/validation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,6 +30,10 @@ func testRequest(t *testing.T, ts *httptest.Server, method,
 }
 
 func TestRouter(t *testing.T) {
+
+	if err := v.Initialize("test_level"); err != nil {
+		return
+	}
 
 	memStorage := s.NewMemoryStorage()
 	metricStorage := h.MetricStorage{
