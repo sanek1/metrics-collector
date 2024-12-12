@@ -13,10 +13,15 @@ var Options struct {
 	pollInterval   int64
 }
 
+const (
+	defaultReportInterval = 10
+	defaultPollInterval   = 2
+)
+
 func ParseFlags() {
 	flag.StringVar(&Options.flagRunAddr, "a", ":8080", "address and port to run server")
-	flag.Int64Var(&Options.reportInterval, "r", 10, "report interval in seconds")
-	flag.Int64Var(&Options.pollInterval, "p", 2, "poll interval in seconds")
+	flag.Int64Var(&Options.reportInterval, "r", defaultReportInterval, "report interval in seconds")
+	flag.Int64Var(&Options.pollInterval, "p", defaultPollInterval, "poll interval in seconds")
 	flag.Parse()
 
 	if len(flag.Args()) > 0 {

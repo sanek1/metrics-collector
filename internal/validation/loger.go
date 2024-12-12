@@ -37,7 +37,11 @@ func Initialize(level string) error {
 	if err != nil {
 		panic(err)
 	}
-	defer logger.Sync()
+	defer func() {
+		if err := logger.Sync(); err != nil {
+			Loger.Errorf("Error syncing logger: %v", err)
+		}
+	}()
 	Loger = *logger.Sugar()
 	return nil
 }
@@ -64,7 +68,6 @@ func WithLogging(h http.Handler) http.Handler {
 			"duration", duration,
 			"size", responseData.size,
 		)
-
 	}
 	// response
 	return http.HandlerFunc(logFn)

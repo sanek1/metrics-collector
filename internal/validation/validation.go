@@ -1,22 +1,24 @@
 package validation
 
 import (
-	"log"
+	"fmt"
 	"net/http"
 	"strings"
 
 	c "github.com/sanek1/metrics-collector/internal/config"
 )
 
-var logger *log.Logger
+type Middleware func(http.Handler) http.Handler
 
-func init() {
-	logger = log.New(log.Writer(), "VALIDATION: ", log.Ldate|log.Ltime|log.Lshortfile)
+func Conveyor(h http.Handler, middlewares ...Middleware) http.Handler {
+	for _, middleware := range middlewares {
+		h = middleware(h)
+	}
+	return h
 }
 
-func Validation(next http.Handler) func(http.ResponseWriter, *http.Request) {
+func ValidationOld(next http.Handler) func(http.ResponseWriter, *http.Request) {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		logValidationMessage("-- start validation --")
 		rw.Header().Set("Content-Type", "application/json")
 		splitedPath := strings.Split(r.URL.Path, "/")
 		if len(splitedPath) < c.MinPathLen {
@@ -27,10 +29,9 @@ func Validation(next http.Handler) func(http.ResponseWriter, *http.Request) {
 			return
 		}
 		next.ServeHTTP(rw, r)
-		logValidationMessage("--validation completed successfully--")
 	})
 }
 
 func logValidationMessage(message string) {
-	logger.Println(message)
+	fmt.Println(message)
 }
