@@ -1,10 +1,12 @@
 package app
 
 import (
-	"log"
 	"net/http"
+	"time"
 
 	"github.com/sanek1/metrics-collector/internal/controller"
+	v "github.com/sanek1/metrics-collector/internal/validation"
+	"go.uber.org/zap"
 )
 
 type App struct {
@@ -22,6 +24,18 @@ func New(addr string) *App {
 }
 
 func (a *App) Run() error {
-	log.Println("Server start on", a.addr)
-	return http.ListenAndServe(a.addr, a.controller.Router())
+	// init zap logger
+	if err := v.Initialize("test_level"); err != nil {
+		return err
+	}
+	server := &http.Server{
+		Addr:              a.addr,
+		Handler:           a.controller.Router(),
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	v.Loger.Info("Running server", zap.String("address", a.addr))
+	return server.ListenAndServe()
 }

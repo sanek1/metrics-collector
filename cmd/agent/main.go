@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"log"
-	"math/rand/v2"
 	"net/http"
 	"os"
 	"runtime"
@@ -13,6 +15,10 @@ import (
 
 type gauge float64
 type counter int64
+
+const (
+	countMetrics = 30
+)
 
 func main() {
 	ParseFlags()
@@ -33,23 +39,23 @@ func run() error {
 	}()
 	client := &http.Client{}
 
-	PollCount := counter(0)
-	metrics := make(map[string]gauge, 30)
+	pollCount := counter(0)
+	metrics := make(map[string]gauge, countMetrics)
 	for {
 		select {
 		case <-pollTick.C:
-			PollCount++
+			pollCount++
 			pollMetrics(metrics)
 		case <-reportTick.C:
-			reportMetrics(metrics, PollCount, client, logger)
+			reportMetrics(metrics, pollCount, client, logger)
 		}
 	}
 }
 
-func reportMetrics(metrics map[string]gauge, PollCount counter, client *http.Client, logger *log.Logger) {
+func reportMetrics(metrics map[string]gauge, pollCount counter, client *http.Client, logger *log.Logger) {
 	addr := Options.flagRunAddr
 
-	metricURL := fmt.Sprint("http://", addr, "/update/counter/PollCount/", PollCount)
+	metricURL := fmt.Sprint("http://", addr, "/update/counter/PollCount/", pollCount)
 	if err := reportClient(client, metricURL, logger); err != nil {
 		logger.Printf("Error reporting metrics: %v", err)
 	}
@@ -61,11 +67,12 @@ func reportMetrics(metrics map[string]gauge, PollCount counter, client *http.Cli
 		}
 	}
 
-	fmt.Fprintf(os.Stdout, " Iteration ---------> %d\n\n", PollCount)
+	fmt.Fprintf(os.Stdout, " Iteration ---------> %d\n\n", pollCount)
 }
 
 func reportClient(client *http.Client, url string, logger *log.Logger) error {
-	req, err := http.NewRequest(http.MethodPost, url, nil)
+	ctx := context.Background()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, http.NoBody)
 	if err != nil {
 		logger.Printf("Error creating request: %v", err)
 		return err
@@ -101,6 +108,11 @@ func reportClient(client *http.Client, url string, logger *log.Logger) error {
 }
 
 func pollMetrics(metrics map[string]gauge) {
+	var num uint32
+	err := binary.Read(rand.Reader, binary.LittleEndian, &num)
+	if err != nil {
+		log.Printf("Error reading random number: %v", err)
+	}
 	var rtm runtime.MemStats
 	runtime.ReadMemStats(&rtm)
 	metrics["Alloc"] = gauge(rtm.Alloc)
@@ -130,5 +142,5 @@ func pollMetrics(metrics map[string]gauge) {
 	metrics["StackSys"] = gauge(rtm.StackSys)
 	metrics["Sys"] = gauge(rtm.Sys)
 	metrics["TotalAlloc"] = gauge(rtm.TotalAlloc)
-	metrics["RandomValue"] = gauge(rand.Float64())
+	metrics["RandomValue"] = gauge(num)
 }
