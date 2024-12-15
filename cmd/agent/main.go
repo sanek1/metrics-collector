@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -11,10 +13,9 @@ import (
 	"os"
 	"runtime"
 	"time"
-)
 
-type gauge float64
-type counter int64
+	m "github.com/sanek1/metrics-collector/internal/validation"
+)
 
 const (
 	countMetrics = 30
@@ -39,45 +40,64 @@ func run() error {
 	}()
 	client := &http.Client{}
 
-	pollCount := counter(0)
-	metrics := make(map[string]gauge, countMetrics)
+	var pollCount int64 = 0
+	metrics := make(map[string]float64, countMetrics)
 	for {
 		select {
 		case <-pollTick.C:
 			pollCount++
 			pollMetrics(metrics)
 		case <-reportTick.C:
-			reportMetrics(metrics, pollCount, client, logger)
+			reportMetrics(metrics, &pollCount, client, logger)
 		}
 	}
 }
 
-func reportMetrics(metrics map[string]gauge, pollCount counter, client *http.Client, logger *log.Logger) {
+func reportMetrics(metrics map[string]float64, pollCount *int64, client *http.Client, logger *log.Logger) {
+	fmt.Fprintf(os.Stdout, "--------- start response ---------\n\n")
 	addr := Options.flagRunAddr
-
-	metricURL := fmt.Sprint("http://", addr, "/update/counter/PollCount/", pollCount)
-	if err := reportClient(client, metricURL, logger); err != nil {
+	metricURL := fmt.Sprint("http://", addr, "/update/counter/PollCount/", *pollCount)
+	metrics2 := m.Metrics{
+		ID:    "PollCount",
+		MType: "counter",
+		Delta: pollCount,
+	}
+	if err := reportClient(client, metricURL, metrics2, logger); err != nil {
 		logger.Printf("Error reporting metrics: %v", err)
 	}
 
-	for k, v := range metrics {
-		metricURL = fmt.Sprint("http://", addr, "/update/gauge/", k, "/", v)
-		if err := reportClient(client, metricURL, logger); err != nil {
+	for name, v := range metrics {
+		metricURL = fmt.Sprint("http://", addr, "/update/gauge/", name, "/", v)
+
+		metrics3 := m.Metrics{
+			ID:    name,
+			MType: "gauge",
+			Value: &v,
+		}
+
+		if err := reportClient(client, metricURL, metrics3, logger); err != nil {
 			logger.Printf("Error reporting metrics: %v", err)
 		}
 	}
-
-	fmt.Fprintf(os.Stdout, " Iteration ---------> %d\n\n", pollCount)
+	fmt.Fprintf(os.Stdout, "--------- end response ---------\n\n")
+	fmt.Fprintf(os.Stdout, "--------- NEW ITERATION %d ---------> \n\n", *pollCount)
 }
 
-func reportClient(client *http.Client, url string, logger *log.Logger) error {
+func reportClient(client *http.Client, url string, m m.Metrics, logger *log.Logger) error {
 	ctx := context.Background()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, http.NoBody)
+	reqBody, err := buildMetrickBody(m)
+	if err != nil {
+		logger.Printf("Error building request body: %v", err)
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(reqBody))
 	if err != nil {
 		logger.Printf("Error creating request: %v", err)
 		return err
 	}
-	req.Header.Set("Content-Type", "text/plain")
+
+	req.Header.Set("Content-Type", "application/json")
 	cookie := &http.Cookie{
 		Name:   "Token",
 		Value:  "TEST_TOKEN",
@@ -95,6 +115,7 @@ func reportClient(client *http.Client, url string, logger *log.Logger) error {
 		logger.Printf("Error reading response body: %v", err)
 		return err
 	}
+
 	os.Stdout.Write(body)
 	fmt.Fprintf(os.Stdout, " Url: %s status: %d\n", url, resp.StatusCode)
 
@@ -107,7 +128,7 @@ func reportClient(client *http.Client, url string, logger *log.Logger) error {
 	return nil
 }
 
-func pollMetrics(metrics map[string]gauge) {
+func pollMetrics(metrics map[string]float64) {
 	var num uint32
 	err := binary.Read(rand.Reader, binary.LittleEndian, &num)
 	if err != nil {
@@ -115,32 +136,40 @@ func pollMetrics(metrics map[string]gauge) {
 	}
 	var rtm runtime.MemStats
 	runtime.ReadMemStats(&rtm)
-	metrics["Alloc"] = gauge(rtm.Alloc)
-	metrics["BuckHashSys"] = gauge(rtm.BuckHashSys)
-	metrics["Frees"] = gauge(rtm.Frees)
-	metrics["GCCPUFraction"] = gauge(rtm.GCCPUFraction)
-	metrics["GCSys"] = gauge(rtm.GCSys)
-	metrics["HeapAlloc"] = gauge(rtm.HeapAlloc)
-	metrics["HeapIdle"] = gauge(rtm.HeapIdle)
-	metrics["HeapInuse"] = gauge(rtm.HeapInuse)
-	metrics["HeapObjects"] = gauge(rtm.HeapObjects)
-	metrics["HeapReleased"] = gauge(rtm.HeapReleased)
-	metrics["HeapSys"] = gauge(rtm.HeapSys)
-	metrics["LastGC"] = gauge(rtm.LastGC)
-	metrics["Lookups"] = gauge(rtm.Lookups)
-	metrics["MCacheInuse"] = gauge(rtm.MCacheInuse)
-	metrics["MCacheSys"] = gauge(rtm.MCacheSys)
-	metrics["MSpanInuse"] = gauge(rtm.MSpanInuse)
-	metrics["MSpanSys"] = gauge(rtm.MSpanSys)
-	metrics["Mallocs"] = gauge(rtm.Mallocs)
-	metrics["NextGC"] = gauge(rtm.NextGC)
-	metrics["NumForcedGC"] = gauge(rtm.NumForcedGC)
-	metrics["NumGC"] = gauge(rtm.NumGC)
-	metrics["OtherSys"] = gauge(rtm.OtherSys)
-	metrics["PauseTotalNs"] = gauge(rtm.PauseTotalNs)
-	metrics["StackInuse"] = gauge(rtm.StackInuse)
-	metrics["StackSys"] = gauge(rtm.StackSys)
-	metrics["Sys"] = gauge(rtm.Sys)
-	metrics["TotalAlloc"] = gauge(rtm.TotalAlloc)
-	metrics["RandomValue"] = gauge(num)
+	metrics["Alloc"] = float64(rtm.Alloc)
+	metrics["BuckHashSys"] = float64(rtm.BuckHashSys)
+	metrics["Frees"] = float64(rtm.Frees)
+	metrics["GCCPUFraction"] = float64(rtm.GCCPUFraction)
+	metrics["GCSys"] = float64(rtm.GCSys)
+	metrics["HeapAlloc"] = float64(rtm.HeapAlloc)
+	metrics["HeapIdle"] = float64(rtm.HeapIdle)
+	metrics["HeapInuse"] = float64(rtm.HeapInuse)
+	metrics["HeapObjects"] = float64(rtm.HeapObjects)
+	metrics["HeapReleased"] = float64(rtm.HeapReleased)
+	metrics["HeapSys"] = float64(rtm.HeapSys)
+	metrics["LastGC"] = float64(rtm.LastGC)
+	metrics["Lookups"] = float64(rtm.Lookups)
+	metrics["MCacheInuse"] = float64(rtm.MCacheInuse)
+	metrics["MCacheSys"] = float64(rtm.MCacheSys)
+	metrics["MSpanInuse"] = float64(rtm.MSpanInuse)
+	metrics["MSpanSys"] = float64(rtm.MSpanSys)
+	metrics["Mallocs"] = float64(rtm.Mallocs)
+	metrics["NextGC"] = float64(rtm.NextGC)
+	metrics["NumForcedGC"] = float64(rtm.NumForcedGC)
+	metrics["NumGC"] = float64(rtm.NumGC)
+	metrics["OtherSys"] = float64(rtm.OtherSys)
+	metrics["PauseTotalNs"] = float64(rtm.PauseTotalNs)
+	metrics["StackInuse"] = float64(rtm.StackInuse)
+	metrics["StackSys"] = float64(rtm.StackSys)
+	metrics["Sys"] = float64(rtm.Sys)
+	metrics["TotalAlloc"] = float64(rtm.TotalAlloc)
+	metrics["RandomValue"] = float64(num)
+}
+
+func buildMetrickBody(m m.Metrics) ([]byte, error) {
+	body, err := json.Marshal(m)
+	if err != nil {
+		return nil, err
+	}
+	return body, nil
 }

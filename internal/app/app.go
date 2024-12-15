@@ -25,7 +25,7 @@ func New(addr string) *App {
 
 func (a *App) Run() error {
 	// init zap logger
-	if err := v.Initialize("test_level"); err != nil {
+	if _, err := v.Initialize("test_level"); err != nil {
 		return err
 	}
 	server := &http.Server{

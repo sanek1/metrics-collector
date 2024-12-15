@@ -8,46 +8,49 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	m "github.com/sanek1/metrics-collector/internal/validation"
 	"github.com/stretchr/testify/assert"
 )
 
+const ()
+
 func Test_reportClient(t *testing.T) {
-	tests := []struct {
-		name  string
-		key   string
-		value gauge
-		url   string
-		want  string
-	}{
+
+	value1 := float64(123)
+	value2 := float64(-123)
+	value3 := float64(0)
+	value4 := float64(1.1)
+
+	tests := []m.Metrics{
 		{
-			name:  "Alloc",
-			key:   "Alloc",
-			value: gauge(123),
-			url:   "/update1/gauge/Alloc/123",
+			ID:    "Alloc",
+			MType: "gauge",
+			Value: &value1,
+			//url:   "/update1/gauge/Alloc/123",
 		},
 		{
-			name:  "BuckHashSys",
-			key:   "BuckHashSys",
-			value: gauge(-123),
-			url:   "/update/gauge/BuckHashSys/-123",
+			ID:    "BuckHashSys",
+			MType: "gauge",
+			Value: &value2,
+			//url:   "/up2ate/gauge/BuckHashSys/-123",
 		},
 		{
-			name:  "Frees",
-			key:   "Frees",
-			value: gauge(0),
-			url:   "/update/gauge/Frees/0",
+			ID:    "Frees",
+			MType: "gauge",
+			Value: &value3,
+			//url:   "/update/gauge/Frees/0",
 		},
 		{
-			name:  "GCCPUFraction",
-			key:   "GCCPUFraction",
-			value: gauge(1.1),
-			url:   "/update/gauge/GCCPUFraction/0",
+			ID:    "GCCPUFraction",
+			MType: "gauge",
+			Value: &value4,
+			//url:   "/update/gauge/GCCPUFraction/0",
 		},
 		{
-			name:  "wrong path",
-			key:   "GCCPUFraction",
-			value: gauge(1.1),
-			url:   "/update111/gauge/GCCPUFraction/0",
+			ID:    "wrong path",
+			MType: "gauge",
+			Value: &value4,
+			//url:   "/update111/gauge/GCCPUFraction/0",
 		},
 	}
 
@@ -61,9 +64,9 @@ func Test_reportClient(t *testing.T) {
 	logger := log.New(io.Discard, "", log.LstdFlags)
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			metricURL := fmt.Sprint(testServer.URL, tt.url)
-			err := reportClient(&http.Client{}, metricURL, logger)
+		t.Run(tt.ID, func(t *testing.T) {
+			metricURL := fmt.Sprint(testServer.URL, "/update/gauge/"+tt.ID)
+			err := reportClient(&http.Client{}, metricURL, tt, logger)
 			assert.Equal(t, err, nil)
 		})
 	}

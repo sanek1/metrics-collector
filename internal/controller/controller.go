@@ -17,6 +17,7 @@ func New() *Controller {
 	storageImpl := storage.NewMemoryStorage()
 	metricStorage := handlers.MetricStorage{
 		Storage: storageImpl,
+		Logger:  storageImpl.Logger,
 	}
 
 	return &Controller{

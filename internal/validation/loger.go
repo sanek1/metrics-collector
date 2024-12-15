@@ -2,9 +2,11 @@ package validation
 
 import (
 	"net/http"
+	"os"
 	"time"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 var Loger zap.SugaredLogger
@@ -32,18 +34,29 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 	r.responseData.status = statusCode
 }
 
-func Initialize(level string) error {
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		panic(err)
+func Initialize(level string) (*zap.SugaredLogger, error) {
+	atomicLevel := zap.NewAtomicLevel()
+
+	atomicLevel.SetLevel(zap.InfoLevel)
+
+	switch level {
+	case "debug":
+		atomicLevel.SetLevel(zap.DebugLevel)
+	case "info":
+		atomicLevel.SetLevel(zap.InfoLevel)
+	default:
+		atomicLevel.SetLevel(zap.InfoLevel)
 	}
-	defer func() {
-		if err := logger.Sync(); err != nil {
-			Loger.Errorf("Error syncing logger: %v", err)
-		}
-	}()
+
+	logger := zap.New(zapcore.NewCore(
+		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
+		zapcore.Lock(os.Stdout),
+		atomicLevel,
+	))
+
 	Loger = *logger.Sugar()
-	return nil
+
+	return &Loger, nil
 }
 
 func WithLogging(h http.Handler) http.Handler {

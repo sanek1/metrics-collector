@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -16,10 +17,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func testRequest(t *testing.T, ts *httptest.Server, method,
-	path string) (*http.Response, string) {
+type testTable struct {
+	url    string
+	body   string
+	want   string
+	status int
+}
+
+func testRequest(t *testing.T, ts *httptest.Server, method string, str testTable) (*http.Response, string) {
 	ctx := context.Background()
-	req, err := http.NewRequestWithContext(ctx, method, ts.URL+path, nil)
+
+	//http.Post(`http://localhost:8080`, `application/json`, bytes.NewBufferString(`{"ID": 10, "NaMe": "Gopher", "company": "Don't Panic"}`))
+
+	req, err := http.NewRequestWithContext(ctx, method, ts.URL+str.url, bytes.NewBufferString(str.body))
 	require.NoError(t, err)
 
 	resp, err := ts.Client().Do(req)
@@ -32,7 +42,7 @@ func testRequest(t *testing.T, ts *httptest.Server, method,
 }
 
 func TestRouter(t *testing.T) {
-	if err := v.Initialize("test_level"); err != nil {
+	if _, err := v.Initialize("test_level"); err != nil {
 		return
 	}
 
@@ -43,20 +53,18 @@ func TestRouter(t *testing.T) {
 
 	ts := httptest.NewServer(rc.InitRouting(metricStorage))
 	defer ts.Close()
-	var testTable = []struct {
-		url    string
-		want   string
-		status int
-	}{
-		{"/update/counter/Mallocs/777", `{"value":"Metric Name: Mallocs, Metric Value:777"}`, http.StatusOK},
-		{"/update/gauge/Alloc/777", `{"value":"Metric Name: Alloc, Metric Value:777"}`, http.StatusOK},
+	var testTable = []testTable{
+		{"/update/counter/Mallocs/777", `{"id": "test_Mallocs", "type": "counter", "delta": 5, "value": 123.4}`, `{"id":"test_Mallocs","type":"counter","delta":5}`, http.StatusOK},
+		{"/update/counter/Mallocs/777", `{"id": "test_Mallocs", "type": "counter", "delta": 6, "value": 123.4}`, `{"id":"test_Mallocs","type":"counter","delta":11}`, http.StatusOK}, // expected 5+5=10
+
+		{"/update/gauge/Alloc/777", `{"id": "test_Alloc", "type": "gauge", "delta": 6, "value": 123.4}`, `{"id":"test_Alloc","type":"gauge","delta":6,"value":123.4}`, http.StatusOK},
 		//bad response
-		{"/update/unknown/Mallocs/7", "Bad Request Handler\n", http.StatusBadRequest},
-		{"/update1/counter/Mallocs/7", "Not Implemented\n", http.StatusBadRequest},
-		{"/update/gauge/Alloc/77.7.", "The value does not match the expected type.\n", http.StatusBadRequest},
+		{"/update/unknown/Mallocs/7", "", "Bad Request Handler\n", http.StatusBadRequest},
+		{"/update1/counter/Mallocs/7", "", "Not Implemented\n", http.StatusBadRequest},
+		{"/update/gauge/Alloc/77.7.", "", "No request body\n", http.StatusBadRequest},
 	}
 	for _, v := range testTable {
-		resp, post := testRequest(t, ts, "POST", v.url)
+		resp, post := testRequest(t, ts, "POST", v)
 		defer resp.Body.Close()
 		assert.Equal(t, v.status, resp.StatusCode)
 		if isValidJSON(v.want) {
