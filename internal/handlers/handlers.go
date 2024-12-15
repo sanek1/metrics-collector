@@ -32,10 +32,30 @@ func (ms MetricStorage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.
 	nameMetric := chi.URLParam(r, "*")
 
 	if m, ok := ms.Storage.GetMetrics(typeMetric, nameMetric); ok {
-		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		if _, err := rw.Write([]byte(m)); err != nil {
-			log.Printf("Error writing response: %v", err)
+		resp, err := json.Marshal(m)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
 		}
+		sendResultStatusOK(rw, resp)
+		return
+	}
+	http.Error(rw, "No such value exists", http.StatusNotFound)
+}
+
+func (ms MetricStorage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http.Request) {
+	model, err := parseModel(rw, r)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if m, ok := ms.Storage.GetMetrics(model.MType, model.ID); ok {
+		resp, err := json.Marshal(m)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sendResultStatusOK(rw, resp)
 		return
 	}
 	http.Error(rw, "No such value exists", http.StatusNotFound)

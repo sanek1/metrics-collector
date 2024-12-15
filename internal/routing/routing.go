@@ -14,6 +14,7 @@ func InitRouting(ms h.MetricStorage) http.Handler {
 
 	r.Get("/*", http.HandlerFunc(ms.MainPageHandler))
 	r.Get("/{value}/{type}/*", http.HandlerFunc(ms.GetMetricsByNameHandler))
+	r.Post("/value/*", http.HandlerFunc(ms.GetMetricsByValueHandler))
 	// post
 	r.Post("/*", v.ValidationOld(http.HandlerFunc(h.NotImplementedHandler)))
 	r.Route("/update", func(r chi.Router) {

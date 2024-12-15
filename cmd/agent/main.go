@@ -46,7 +46,9 @@ func run() error {
 		select {
 		case <-pollTick.C:
 			pollCount++
+			metrics = make(map[string]float64, countMetrics)
 			pollMetrics(metrics)
+
 		case <-reportTick.C:
 			reportMetrics(metrics, &pollCount, client, logger)
 		}
@@ -110,14 +112,17 @@ func reportClient(client *http.Client, url string, m validation.Metrics, logger 
 		logger.Printf("Error sending request: %v", err)
 		return err
 	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		logger.Printf("Error reading response body: %v", err)
 		return err
 	}
 
-	os.Stdout.Write(body)
-	fmt.Fprintf(os.Stdout, " Url: %s status: %d\n", url, resp.StatusCode)
+	if err := json.Unmarshal(body, &m); err != nil {
+		logger.Printf("Error unmarshaling response body: %v", err)
+		return err
+	}
 
 	defer resp.Body.Close()
 

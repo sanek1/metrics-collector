@@ -48,18 +48,12 @@ func (ms *MemoryStorage) GetAllMetrics() []string {
 	return result
 }
 
-func (ms *MemoryStorage) GetMetrics(key, metricName string) (string, bool) {
+func (ms *MemoryStorage) GetMetrics(key, metricName string) (*m.Metrics, bool) {
 	metric, ok := ms.Metrics[metricName]
 	if !ok {
-		return "", false
+		return nil, false
 	}
-	switch key {
-	case "gauge":
-		return fmt.Sprint(*metric.Value), true
-	case "counter":
-		return fmt.Sprint(*metric.Delta), true
-	}
-	return "", false
+	return &metric, true
 }
 
 func (ms *MemoryStorage) SetCounter(model m.Metrics) m.Metrics {
