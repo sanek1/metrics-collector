@@ -12,10 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const ()
-
 func Test_reportClient(t *testing.T) {
-
 	value1 := float64(123)
 	value2 := float64(-123)
 	value3 := float64(0)

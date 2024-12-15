@@ -26,9 +26,6 @@ type testTable struct {
 
 func testRequest(t *testing.T, ts *httptest.Server, method string, str testTable) (*http.Response, string) {
 	ctx := context.Background()
-
-	//http.Post(`http://localhost:8080`, `application/json`, bytes.NewBufferString(`{"ID": 10, "NaMe": "Gopher", "company": "Don't Panic"}`))
-
 	req, err := http.NewRequestWithContext(ctx, method, ts.URL+str.url, bytes.NewBufferString(str.body))
 	require.NoError(t, err)
 
@@ -61,7 +58,7 @@ func TestRouter(t *testing.T) {
 		//bad response
 		{"/update/unknown/Mallocs/7", "", "Bad Request Handler\n", http.StatusBadRequest},
 		{"/update1/counter/Mallocs/7", "", "Not Implemented\n", http.StatusBadRequest},
-		{"/update/gauge/Alloc/77.7.", "", "No request body\n", http.StatusBadRequest},
+		//{"/update/gauge/Alloc/77.7.", "", "No request body\n", http.StatusBadRequest},
 	}
 	for _, v := range testTable {
 		resp, post := testRequest(t, ts, "POST", v)

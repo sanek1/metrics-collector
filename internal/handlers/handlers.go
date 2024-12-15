@@ -1,12 +1,17 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi"
+	c "github.com/sanek1/metrics-collector/internal/config"
 	v "github.com/sanek1/metrics-collector/internal/validation"
 	"go.uber.org/zap"
 )
@@ -37,7 +42,6 @@ func (ms MetricStorage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.
 }
 
 func (ms MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
-
 	model, err := parseModel(rw, r)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
@@ -57,7 +61,6 @@ func (ms MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (ms MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request) {
-
 	model, err := parseModel(rw, r)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
@@ -75,10 +78,25 @@ func (ms MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request) 
 func parseModel(rw http.ResponseWriter, r *http.Request) (v.Metrics, error) {
 	var model v.Metrics
 	if r.ContentLength == 0 {
-		//http.Error(rw, "No request body", http.StatusBadRequest)
-		return model, fmt.Errorf("No request body")
+		key, name, val, err := readingDataFromURL(r)
+		if err != nil {
+			http.Error(rw, "The value does not match the expected type.", http.StatusBadRequest)
+			return model, err
+		}
+		intVal := int64(*val)
+		model = v.Metrics{
+			ID:    name,
+			MType: key,
+			Delta: &intVal,
+			Value: val,
+		}
+		resp, err := json.Marshal(model)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return model, err
+		}
+		r.Body = io.NopCloser(bytes.NewReader(resp))
 	}
-
 	defer r.Body.Close()
 
 	decoder := json.NewDecoder(r.Body)
@@ -116,5 +134,27 @@ func generateHTML(metrics []string) string {
 func sendResultStatusOK(rw http.ResponseWriter, resp []byte) {
 	rw.WriteHeader(http.StatusOK)
 	rw.Header().Set("Content-Type", "application/json")
-	rw.Write(resp)
+	_, err := rw.Write(resp)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func readingDataFromURL(r *http.Request) (key, name string, value *float64, err error) {
+	splitedPath := strings.Split(r.URL.Path, "/")
+
+	metrickType := splitedPath[c.TypeMetric]
+	metrickName := splitedPath[c.MetricName]
+	metricValue, err := convertStringToFloat64(splitedPath[c.MetricVal])
+
+	return metrickType, metrickName, metricValue, err
+}
+
+func convertStringToFloat64(str string) (*float64, error) {
+	floatVal, err := strconv.ParseFloat(str, 64)
+	if err != nil {
+		return nil, err
+	}
+	return &floatVal, nil
 }

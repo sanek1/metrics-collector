@@ -14,7 +14,7 @@ import (
 	"runtime"
 	"time"
 
-	m "github.com/sanek1/metrics-collector/internal/validation"
+	"github.com/sanek1/metrics-collector/internal/validation"
 )
 
 const (
@@ -57,7 +57,7 @@ func reportMetrics(metrics map[string]float64, pollCount *int64, client *http.Cl
 	fmt.Fprintf(os.Stdout, "--------- start response ---------\n\n")
 	addr := Options.flagRunAddr
 	metricURL := fmt.Sprint("http://", addr, "/update/counter/PollCount/", *pollCount)
-	metrics2 := m.Metrics{
+	metrics2 := validation.Metrics{
 		ID:    "PollCount",
 		MType: "counter",
 		Delta: pollCount,
@@ -69,7 +69,7 @@ func reportMetrics(metrics map[string]float64, pollCount *int64, client *http.Cl
 	for name, v := range metrics {
 		metricURL = fmt.Sprint("http://", addr, "/update/gauge/", name, "/", v)
 
-		metrics3 := m.Metrics{
+		metrics3 := validation.Metrics{
 			ID:    name,
 			MType: "gauge",
 			Value: &v,
@@ -83,7 +83,7 @@ func reportMetrics(metrics map[string]float64, pollCount *int64, client *http.Cl
 	fmt.Fprintf(os.Stdout, "--------- NEW ITERATION %d ---------> \n\n", *pollCount)
 }
 
-func reportClient(client *http.Client, url string, m m.Metrics, logger *log.Logger) error {
+func reportClient(client *http.Client, url string, m validation.Metrics, logger *log.Logger) error {
 	ctx := context.Background()
 	reqBody, err := buildMetrickBody(m)
 	if err != nil {
@@ -166,7 +166,7 @@ func pollMetrics(metrics map[string]float64) {
 	metrics["RandomValue"] = float64(num)
 }
 
-func buildMetrickBody(m m.Metrics) ([]byte, error) {
+func buildMetrickBody(m validation.Metrics) ([]byte, error) {
 	body, err := json.Marshal(m)
 	if err != nil {
 		return nil, err
