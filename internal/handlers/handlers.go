@@ -28,23 +28,39 @@ func (ms MetricStorage) MainPageHandler(rw http.ResponseWriter, r *http.Request)
 }
 
 func (ms MetricStorage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.Request) {
+
 	typeMetric := chi.URLParam(r, "type")
 	nameMetric := chi.URLParam(r, "*")
 
+	ms.Logger.Infoln(
+		"uri", r.RequestURI,
+		"method", r.Method,
+		"Content-Type", r.Header.Get("Content-Type"),
+		"hander", "GetMetricsByNameHandler",
+		"typeMetric", typeMetric,
+		"nameMetric", nameMetric,
+	)
+
 	if m, ok := ms.Storage.GetMetrics(typeMetric, nameMetric); ok {
-		resp, err := json.Marshal(m)
-		if err != nil {
-			http.Error(rw, err.Error(), http.StatusInternalServerError)
-			return
+		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		answer := ""
+		if m.MType == "counter" {
+			answer = fmt.Sprint(*m.Delta)
+		} else if m.MType == "gauge" {
+			answer = fmt.Sprint(*m.Value)
 		}
-		sendResultStatusOK(rw, resp)
+
+		if _, err := rw.Write([]byte(answer)); err != nil {
+			log.Printf("Error writing response: %v", err)
+		}
 		return
 	}
 	http.Error(rw, "No such value exists", http.StatusNotFound)
 }
 
 func (ms MetricStorage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http.Request) {
-	model, err := parseModel(rw, r)
+	rw.Header().Set("Content-Type", "application/json")
+	model, _, err := parseModel(rw, r)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
@@ -56,15 +72,62 @@ func (ms MetricStorage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http
 			return
 		}
 		sendResultStatusOK(rw, resp)
+		// if !isOK {
+		// 	sendResultStatusOK(rw, resp)
+		// } else {
+		// 	rw.WriteHeader(http.StatusOK)
+		// 	rw.Header().Set("Content-Type", "application/json")
+		// 	parts := []string{"Metric Name: ", model.ID, ", Metric Value:", fmt.Sprint(model.Value)}
+		// 	err = json.NewEncoder(rw).Encode(struct {
+		// 		Value string `json:"value"`
+		// 	}{strings.Join(parts, "")})
+
+		// }
+
 		return
 	}
 	http.Error(rw, "No such value exists", http.StatusNotFound)
 }
 
-func (ms MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
-	model, err := parseModel(rw, r)
+func (ms MetricStorage) GetMetricsByValueHandler2(rw http.ResponseWriter, r *http.Request) {
+	model, _, err := parseModel(rw, r)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
+		sendResultStatusNotOK(rw, []byte(err.Error()))
+		return
+	}
+	switch model.MType {
+	case "counter":
+		newmodel := ms.Storage.SetCounter(model)
+		resp, err := json.Marshal(newmodel)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusBadRequest)
+			return
+		}
+		sendResultStatusOK(rw, resp)
+	case "gauge":
+		if ok := ms.Storage.SetGauge(model); !ok {
+			http.Error(rw, "No such value exists", http.StatusNotFound)
+			return
+		}
+		resp, err := json.Marshal(model)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusBadRequest)
+			return
+		}
+		sendResultStatusOK(rw, resp)
+	default:
+
+		http.Error(rw, "No such value exists", http.StatusNotFound)
+		sendResultStatusNotOK(rw, []byte(err.Error()))
+	}
+}
+
+func (ms MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
+	model, _, err := parseModel(rw, r)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+		sendResultStatusNotOK(rw, []byte(err.Error()))
 		return
 	}
 
@@ -78,10 +141,11 @@ func (ms MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sendResultStatusOK(rw, resp)
+
 }
 
 func (ms MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request) {
-	model, err := parseModel(rw, r)
+	model, _, err := parseModel(rw, r)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
@@ -95,13 +159,13 @@ func (ms MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request) 
 	sendResultStatusOK(rw, resp)
 }
 
-func parseModel(rw http.ResponseWriter, r *http.Request) (v.Metrics, error) {
+func parseModel(rw http.ResponseWriter, r *http.Request) (v.Metrics, bool, error) {
 	var model v.Metrics
 	if r.ContentLength == 0 {
 		key, name, val, err := readingDataFromURL(r)
 		if err != nil {
 			http.Error(rw, "The value does not match the expected type.", http.StatusBadRequest)
-			return model, err
+			return model, false, err
 		}
 		intVal := int64(*val)
 		model = v.Metrics{
@@ -112,8 +176,8 @@ func parseModel(rw http.ResponseWriter, r *http.Request) (v.Metrics, error) {
 		}
 		resp, err := json.Marshal(model)
 		if err != nil {
-			http.Error(rw, err.Error(), http.StatusInternalServerError)
-			return model, err
+			http.Error(rw, err.Error(), http.StatusBadRequest)
+			return model, false, err
 		}
 		r.Body = io.NopCloser(bytes.NewReader(resp))
 	}
@@ -122,15 +186,15 @@ func parseModel(rw http.ResponseWriter, r *http.Request) (v.Metrics, error) {
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&model); err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
-		return model, err
+		return model, true, err
 	}
 
 	if model.MType == v.TypeGauge || model.MType == v.TypeCounter {
-		return model, nil
+		return model, true, nil
 	} else {
 		v.Loger.Error("unsupported request type", zap.String("type", model.MType))
-		rw.WriteHeader(http.StatusInternalServerError)
-		return model, fmt.Errorf("unsupported request type: %s", model.MType)
+		rw.WriteHeader(http.StatusBadRequest)
+		return model, false, fmt.Errorf("Unsupported request type")
 	}
 }
 
@@ -153,6 +217,16 @@ func generateHTML(metrics []string) string {
 
 func sendResultStatusOK(rw http.ResponseWriter, resp []byte) {
 	rw.WriteHeader(http.StatusOK)
+	rw.Header().Set("Content-Type", "application/json")
+	_, err := rw.Write(resp)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func sendResultStatusNotOK(rw http.ResponseWriter, resp []byte) {
+	rw.WriteHeader(http.StatusBadRequest)
 	rw.Header().Set("Content-Type", "application/json")
 	_, err := rw.Write(resp)
 	if err != nil {

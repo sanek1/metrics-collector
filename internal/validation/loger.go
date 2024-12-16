@@ -48,8 +48,13 @@ func Initialize(level string) (*zap.SugaredLogger, error) {
 		atomicLevel.SetLevel(zap.InfoLevel)
 	}
 
+	encoderConfig := zap.NewProductionEncoderConfig()
+	encoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+		enc.AppendString(t.Format("15:04:05"))
+	}
+
 	logger := zap.New(zapcore.NewCore(
-		zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
+		zapcore.NewJSONEncoder(encoderConfig),
 		zapcore.Lock(os.Stdout),
 		atomicLevel,
 	))

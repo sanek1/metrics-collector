@@ -67,12 +67,25 @@ func (ms *MemoryStorage) SetCounter(model m.Metrics) m.Metrics {
 			Delta: model.Delta,
 		}
 	}
-	ms.Logger.Info("SetCounter. The metric has been updated: ID:=%s, Type:=%s, Gauge:%.2f", model.ID, model.MType, *model.Delta)
+	ms.Logger.Infoln(
+		"hander", "SetCounter",
+		"id", model.ID,
+		"MType", model.MType,
+		"Delta_before", *ms.Metrics[model.ID].Delta,
+		"Delta_after", *model.Delta,
+	)
+
 	return ms.Metrics[model.ID]
 }
 
 func (ms *MemoryStorage) SetGauge(model m.Metrics) bool {
 	ms.Metrics[model.ID] = m.Metrics{ID: model.ID, MType: model.MType, Value: model.Value}
-	ms.Logger.Info("SetGauge. The metric has been updated: ID:=%s, Type:=%s, Gauge:%.2f", model.ID, model.MType, *model.Value)
+	ms.Logger.Infoln(
+		"hander", "SetGauge",
+		"id", model.ID,
+		"MType", model.MType,
+		"Value_before", *ms.Metrics[model.ID].Value,
+		"Value_after", *model.Value,
+	)
 	return true
 }

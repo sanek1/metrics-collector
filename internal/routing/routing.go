@@ -18,7 +18,9 @@ func InitRouting(ms h.MetricStorage) http.Handler {
 	// post
 	r.Post("/*", v.ValidationOld(http.HandlerFunc(h.NotImplementedHandler)))
 	r.Route("/update", func(r chi.Router) {
-		r.Post("/*", v.ValidationOld(http.HandlerFunc(h.BadRequestHandler)))
+		//r.Post("/*", v.ValidationOld(http.HandlerFunc(h.BadRequestHandler)))
+		r.Post("/*", http.HandlerFunc(ms.GetMetricsByValueHandler2))
+		//r.Post("/*", http.HandlerFunc(ms.GetMetricsByValueHandler2))
 		r.Post("/gauge/*", v.ValidationOld(http.HandlerFunc(ms.GaugeHandler)))
 		r.Post("/counter/*", v.ValidationOld(http.HandlerFunc(ms.CounterHandler)))
 	})
