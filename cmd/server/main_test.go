@@ -56,7 +56,7 @@ func TestRouter(t *testing.T) {
 
 		{"/update/gauge/Alloc/777", `{"id": "test_Alloc", "type": "gauge", "delta": 6, "value": 123.4}`, `{"id":"test_Alloc","type":"gauge","delta":6,"value":123.4}`, http.StatusOK},
 		//bad response
-		{"/update/unknown/Mallocs/7", "", "Unsupported request type\nUnsupported request type", http.StatusBadRequest},
+		{"/update/unknown/Mallocs/7", "", "unsupported request type\nunsupported request type", http.StatusBadRequest},
 		{"/update1/counter/Mallocs/7", "", "Not Implemented\n", http.StatusBadRequest},
 		//{"/update/gauge/Alloc/77.7.", "", "No request body\n", http.StatusBadRequest},
 	}
