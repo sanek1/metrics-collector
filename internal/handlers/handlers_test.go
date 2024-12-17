@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -14,7 +15,6 @@ import (
 )
 
 func TestGetMetricsByBody(t *testing.T) {
-
 	value1 := float64(123)
 	value2 := int64(-123)
 
@@ -55,7 +55,7 @@ func TestGetMetricsByBody(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-
+	ctx := context.Background()
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ms := MetricStorage{
@@ -65,9 +65,8 @@ func TestGetMetricsByBody(t *testing.T) {
 				},
 			}
 			b, _ := json.Marshal(test.model)
-			req, err := http.NewRequest("POST", "/", bytes.NewBuffer(b))
+			req, err := http.NewRequestWithContext(ctx, "POST", "/", bytes.NewBuffer(b))
 			require.NoError(t, err)
-
 			w := httptest.NewRecorder()
 			ms.GetMetricsHandler(w, req)
 

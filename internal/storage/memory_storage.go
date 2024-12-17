@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -57,6 +58,7 @@ func (ms *MemoryStorage) GetMetrics(key, metricName string) (*m.Metrics, bool) {
 }
 
 func (ms *MemoryStorage) SetCounter(model m.Metrics) m.Metrics {
+	setLog(ms, &model, "SetCounter")
 	if metric, ok := ms.Metrics[model.ID]; ok {
 		*metric.Delta += *model.Delta
 		ms.Metrics[model.ID] = metric
@@ -67,13 +69,12 @@ func (ms *MemoryStorage) SetCounter(model m.Metrics) m.Metrics {
 			Delta: model.Delta,
 		}
 	}
-	//setLog(ms, &model, "SetCounter")
 	return ms.Metrics[model.ID]
 }
 
 func (ms *MemoryStorage) SetGauge(model m.Metrics) bool {
+	setLog(ms, &model, "SetGauge")
 	ms.Metrics[model.ID] = m.Metrics{ID: model.ID, MType: model.MType, Value: model.Value}
-	//setLog(ms, &model, "SetGauge")
 	return true
 }
 
@@ -81,9 +82,12 @@ func setLog(ms *MemoryStorage, model *m.Metrics, name string) {
 	before, after := ms.Metrics[model.ID], *model
 	ms.Logger.Infoln(
 		"hander", name,
-		"id", model.ID,
-		"MType", model.MType,
-		"before", fmt.Sprintf("%+v", before),
-		"after", fmt.Sprintf("%+v", after),
+		"before", formatMetric(before),
+		"after", formatMetric(after),
 	)
+}
+
+func formatMetric(model m.Metrics) string {
+	data, _ := json.Marshal(model) // Игнорируем ошибку для упрощения примера
+	return string(data)
 }

@@ -40,7 +40,7 @@ func GaugeService(rw http.ResponseWriter, model *v.Metrics, ms *MetricStorage) {
 func ParseMetricServices(rw http.ResponseWriter, r *http.Request) (v.Metrics, error) {
 	var model v.Metrics
 	if r.ContentLength == 0 {
-		if err := buildJsonBody(rw, r); err != nil {
+		if err := buildJSONBody(rw, r); err != nil {
 			return model, err
 		}
 	}
@@ -90,7 +90,7 @@ func SendResultStatusNotOK(rw http.ResponseWriter, resp []byte) {
 	}
 }
 
-func buildJsonBody(rw http.ResponseWriter, r *http.Request) (err error) {
+func buildJSONBody(rw http.ResponseWriter, r *http.Request) (err error) {
 	key, name, val, err := readingDataFromURL(r)
 	if err != nil {
 		http.Error(rw, "The value does not match the expected type.", http.StatusBadRequest)
@@ -108,7 +108,8 @@ func buildJsonBody(rw http.ResponseWriter, r *http.Request) (err error) {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return err
 	}
-	r.Body = io.NopCloser(bytes.NewReader(resp)) //set body
+	// set body
+	r.Body = io.NopCloser(bytes.NewReader(resp))
 	return nil
 }
 

@@ -83,7 +83,7 @@ func (ms MetricStorage) GetMetricsHandler(rw http.ResponseWriter, r *http.Reques
 		GaugeService(rw, &model, &ms)
 	default:
 		http.Error(rw, "No such value exists", http.StatusNotFound)
-		SendResultStatusNotOK(rw, []byte(err.Error()))
+		return
 	}
 }
 
