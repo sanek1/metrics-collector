@@ -36,7 +36,6 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 
 func Initialize(level string) (*zap.SugaredLogger, error) {
 	atomicLevel := zap.NewAtomicLevel()
-
 	atomicLevel.SetLevel(zap.InfoLevel)
 
 	switch level {
@@ -60,7 +59,6 @@ func Initialize(level string) (*zap.SugaredLogger, error) {
 	))
 
 	Loger = *logger.Sugar()
-
 	return &Loger, nil
 }
 
