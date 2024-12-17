@@ -2,18 +2,16 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/go-chi/chi"
-	c "github.com/sanek1/metrics-collector/internal/config"
-	"github.com/sanek1/metrics-collector/internal/storage"
 )
 
 func (ms MetricStorage) MainPageHandler(rw http.ResponseWriter, r *http.Request) {
 	metrics := ms.Storage.GetAllMetrics()
-	htmlData := generateHTML(metrics)
+	htmlData := GenerateHTMLServices(metrics)
 	rw.Header().Set("Content-Type", "text/html")
 	rw.WriteHeader(http.StatusOK)
 	_, err := rw.Write([]byte(htmlData))
@@ -26,9 +24,25 @@ func (ms MetricStorage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.
 	typeMetric := chi.URLParam(r, "type")
 	nameMetric := chi.URLParam(r, "*")
 
+	ms.Logger.Infoln(
+		"uri", r.RequestURI,
+		"method", r.Method,
+		"Content-Type", r.Header.Get("Content-Type"),
+		"hander", "GetMetricsByNameHandler",
+		"typeMetric", typeMetric,
+		"nameMetric", nameMetric,
+	)
+
 	if m, ok := ms.Storage.GetMetrics(typeMetric, nameMetric); ok {
 		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		if _, err := rw.Write([]byte(m)); err != nil {
+		answer := ""
+		if m.MType == "counter" {
+			answer = fmt.Sprint(*m.Delta)
+		} else if m.MType == "gauge" {
+			answer = fmt.Sprint(*m.Value)
+		}
+
+		if _, err := rw.Write([]byte(answer)); err != nil {
 			log.Printf("Error writing response: %v", err)
 		}
 		return
@@ -36,39 +50,40 @@ func (ms MetricStorage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.
 	http.Error(rw, "No such value exists", http.StatusNotFound)
 }
 
-func (ms MetricStorage) GaugeHandler(rw http.ResponseWriter, r *http.Request) {
-	key, val, err := readingDataFromURL(r)
+func (ms MetricStorage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Content-Type", "application/json")
+	model, err := ParseMetricServices(rw, r)
 	if err != nil {
-		http.Error(rw, "The value does not match the expected type.", http.StatusBadRequest)
+		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	rw.WriteHeader(http.StatusOK)
-	rw.Header().Set("Content-Type", "application/json")
-
-	err = json.NewEncoder(rw).Encode(struct {
-		Value string `json:"value"`
-	}{ms.Storage.SetGauge(key, val)})
-	if err != nil {
-		log.Printf("Error writing response: %v", err)
+	if m, ok := ms.Storage.GetMetrics(model.MType, model.ID); ok {
+		resp, err := json.Marshal(m)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		SendResultStatusOK(rw, resp)
+		return
 	}
+	http.Error(rw, "No such value exists", http.StatusNotFound)
 }
 
-func (ms MetricStorage) CounterHandler(rw http.ResponseWriter, r *http.Request) {
-	key, val, err := readingDataFromURL(r)
+func (ms MetricStorage) GetMetricsHandler(rw http.ResponseWriter, r *http.Request) {
+	model, err := ParseMetricServices(rw, r)
 	if err != nil {
-		http.Error(rw, "The value does not match the expected type.", http.StatusBadRequest)
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+		SendResultStatusNotOK(rw, []byte(err.Error()))
 		return
 	}
-
-	rw.WriteHeader(http.StatusOK)
-	rw.Header().Set("Content-Type", "application/json")
-
-	err = json.NewEncoder(rw).Encode(struct {
-		Value string `json:"value"`
-	}{ms.Storage.SetCounter(key, val)})
-	if err != nil {
-		log.Printf("Error writing response: %v", err)
+	switch model.MType {
+	case "counter":
+		CounterService(rw, &model, &ms)
+	case "gauge":
+		GaugeService(rw, &model, &ms)
+	default:
+		http.Error(rw, "No such value exists", http.StatusNotFound)
+		return
 	}
 }
 
@@ -78,20 +93,4 @@ func NotImplementedHandler(rw http.ResponseWriter, r *http.Request) {
 
 func BadRequestHandler(rw http.ResponseWriter, r *http.Request) {
 	http.Error(rw, "Bad Request Handler", http.StatusBadRequest)
-}
-
-func generateHTML(metrics []string) string {
-	data := `<html lang="ru"><head><meta charset="UTF-8"><title>Метрики</title></head><body><h1>Метрики</h1>`
-	for _, metric := range metrics {
-		data += `<p>` + metric + `</p>`
-	}
-	data += `</body></html>`
-	return data
-}
-
-func readingDataFromURL(r *http.Request) (key string, value float64, err error) {
-	splitedPath := strings.Split(r.URL.Path, "/")
-	metricKey := splitedPath[c.MetricName]
-	metricValue, err := storage.StrToGauge(splitedPath[c.MetricVal])
-	return metricKey, metricValue, err
 }
