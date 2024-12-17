@@ -67,32 +67,23 @@ func (ms *MemoryStorage) SetCounter(model m.Metrics) m.Metrics {
 			Delta: model.Delta,
 		}
 	}
-	setLog(ms, &model, "SetCounter")
+	//setLog(ms, &model, "SetCounter")
 	return ms.Metrics[model.ID]
 }
 
 func (ms *MemoryStorage) SetGauge(model m.Metrics) bool {
 	ms.Metrics[model.ID] = m.Metrics{ID: model.ID, MType: model.MType, Value: model.Value}
-	setLog(ms, &model, "SetGauge")
+	//setLog(ms, &model, "SetGauge")
 	return true
 }
 
 func setLog(ms *MemoryStorage, model *m.Metrics, name string) {
-	if "SetCounter" == name {
-		ms.Logger.Infoln(
-			"hander", name,
-			"id", model.ID,
-			"MType", model.MType,
-			"Delta_before", *ms.Metrics[model.ID].Delta,
-			"Delta_after", *model.Delta,
-		)
-	} else {
-		ms.Logger.Infoln(
-			"hander", name,
-			"id", model.ID,
-			"MType", model.MType,
-			"Value_before", *ms.Metrics[model.ID].Value,
-			"Value_after", *model.Value,
-		)
-	}
+	before, after := ms.Metrics[model.ID], *model
+	ms.Logger.Infoln(
+		"hander", name,
+		"id", model.ID,
+		"MType", model.MType,
+		"before", fmt.Sprintf("%+v", before),
+		"after", fmt.Sprintf("%+v", after),
+	)
 }
