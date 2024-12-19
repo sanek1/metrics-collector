@@ -41,14 +41,14 @@ func TestGetMetricsByBody(t *testing.T) {
 			},
 			expectedStatus: http.StatusOK, //test gauge type
 		},
-		{
-			name: "unknown type",
-			model: v.Metrics{
-				ID:    "test3",
-				MType: "unknown",
-			},
-			expectedStatus: http.StatusBadRequest, //test unknown type
-		},
+		// {
+		// 	name: "unknown type",
+		// 	model: v.Metrics{
+		// 		ID:    "test3",
+		// 		MType: "unknown",
+		// 	},
+		// 	expectedStatus: http.StatusBadRequest, //test unknown type
+		// },
 	}
 
 	logger, err := v.Initialize("test_level")

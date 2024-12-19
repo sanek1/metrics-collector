@@ -16,8 +16,8 @@ import (
 func Test_reportClient(t *testing.T) {
 	value1 := float64(123)
 	value2 := float64(-123)
-	//value3 := float64(0)
-	//value4 := float64(1.1)
+	value3 := float64(0)
+	value4 := float64(1.1)
 
 	tests := []m.Metrics{
 		{
@@ -33,27 +33,27 @@ func Test_reportClient(t *testing.T) {
 			Value: &value2,
 			//url:   "/up2ate/gauge/BuckHashSys/-123",
 		},
-		// {
-		// 	ID:    "Frees",
-		// 	MType: "gauge",
-		// 	Delta: nil,
-		// 	Value: &value3,
-		// 	//url:   "/update/gauge/Frees/0",
-		// },
-		// {
-		// 	ID:    "GCCPUFraction",
-		// 	MType: "gauge",
-		// 	Delta: nil,
-		// 	Value: &value4,
-		// 	//url:   "/update/gauge/GCCPUFraction/0",
-		// },
-		// {
-		// 	ID:    "wrong path",
-		// 	MType: "gauge",
-		// 	Delta: nil,
-		// 	Value: &value4,
-		// 	//url:   "/update111/gauge/GCCPUFraction/0",
-		// },
+		{
+			ID:    "Frees",
+			MType: "gauge",
+			Delta: nil,
+			Value: &value3,
+			//url:   "/update/gauge/Frees/0",
+		},
+		{
+			ID:    "GCCPUFraction",
+			MType: "gauge",
+			Delta: nil,
+			Value: &value4,
+			//url:   "/update/gauge/GCCPUFraction/0",
+		},
+		{
+			ID:    "wrong path",
+			MType: "gauge",
+			Delta: nil,
+			Value: &value4,
+			//url:   "/update111/gauge/GCCPUFraction/0",
+		},
 	}
 
 	testServer := httptest.NewServer(
