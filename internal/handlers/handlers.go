@@ -72,8 +72,8 @@ func (ms MetricStorage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http
 func (ms MetricStorage) GetMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 	model, err := ParseMetricServices(rw, r)
 	if err != nil {
-		http.Error(rw, err.Error(), http.StatusBadRequest)
-		SendResultStatusNotOK(rw, []byte(err.Error()))
+		ms.Logger.Error(err.Error())
+		SendResultStatusNotOK(rw, []byte(`{"error": "failed to read body"}`))
 		return
 	}
 	switch model.MType {

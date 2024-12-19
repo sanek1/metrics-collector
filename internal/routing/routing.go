@@ -10,18 +10,22 @@ import (
 
 func InitRouting(ms h.MetricStorage) http.Handler {
 	r := chi.NewRouter()
-	r.Use(v.WithLogging)
+	r.Use(v.WithLogging, v.GzipMiddleware)
 
-	r.Get("/*", http.HandlerFunc(ms.MainPageHandler))
-	r.Get("/{value}/{type}/*", http.HandlerFunc(ms.GetMetricsByNameHandler))
+	r.Route("/", func(r chi.Router) {
+		// Get routes
+		r.Get("/*", http.HandlerFunc(ms.MainPageHandler))
+		r.Get("/{value}/{type}/*", http.HandlerFunc(ms.GetMetricsByNameHandler))
 
-	// post
-	r.Post("/*", v.ValidationOld(http.HandlerFunc(h.NotImplementedHandler)))
-	r.Post("/value/*", http.HandlerFunc(ms.GetMetricsByValueHandler))
-	r.Route("/update", func(r chi.Router) {
-		r.Post("/*", http.HandlerFunc(ms.GetMetricsHandler))
-		r.Post("/gauge/*", v.ValidationOld(http.HandlerFunc(ms.GetMetricsHandler)))
-		r.Post("/counter/*", v.ValidationOld(http.HandlerFunc(ms.GetMetricsHandler)))
+		// Post routes
+		r.Post("/*", v.ValidationOld(http.HandlerFunc(h.NotImplementedHandler)))
+		r.Post("/value/*", http.HandlerFunc(ms.GetMetricsByValueHandler))
+
+		r.Route("/update", func(r chi.Router) {
+			r.Post("/*", http.HandlerFunc(ms.GetMetricsHandler))
+			r.Post("/gauge/*", v.ValidationOld(http.HandlerFunc(ms.GetMetricsHandler)))
+			r.Post("/counter/*", v.ValidationOld(http.HandlerFunc(ms.GetMetricsHandler)))
+		})
 	})
 
 	return r
