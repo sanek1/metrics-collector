@@ -19,13 +19,11 @@ const (
 )
 
 func ParseFlags() *Options {
-	flagRunAddr := ""
-	reportInterval := int64(defaultReportInterval)
-	pollInterval := int64(defaultPollInterval)
+	opt := &Options{}
 
-	flag.StringVar(&flagRunAddr, "a", ":8080", "address and port to run server")
-	flag.Int64Var(&reportInterval, "r", defaultReportInterval, "report interval in seconds")
-	flag.Int64Var(&pollInterval, "p", defaultPollInterval, "poll interval in seconds")
+	flag.StringVar(&opt.FlagRunAddr, "a", ":8080", "address and port to run server")
+	flag.Int64Var(&opt.ReportInterval, "r", defaultReportInterval, "report interval in seconds")
+	flag.Int64Var(&opt.PollInterval, "p", defaultPollInterval, "poll interval in seconds")
 	flag.Parse()
 
 	if len(flag.Args()) > 0 {
@@ -34,19 +32,15 @@ func ParseFlags() *Options {
 	}
 
 	if addr := os.Getenv("ADDRESS"); addr != "" {
-		flagRunAddr = addr
+		opt.FlagRunAddr = addr
 	}
 
 	if interval := os.Getenv("REPORT_INTERVAL"); interval != "" {
-		reportInterval, _ = strconv.ParseInt(interval, 10, 64)
+		opt.ReportInterval, _ = strconv.ParseInt(interval, 10, 64)
 	}
 
 	if interval := os.Getenv("POLL_INTERVAL"); interval != "" {
-		pollInterval, _ = strconv.ParseInt(interval, 10, 64)
+		opt.PollInterval, _ = strconv.ParseInt(interval, 10, 64)
 	}
-	return &Options{
-		FlagRunAddr:    flagRunAddr,
-		ReportInterval: reportInterval,
-		PollInterval:   pollInterval,
-	}
+	return opt
 }
