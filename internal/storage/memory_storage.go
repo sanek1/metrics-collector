@@ -31,19 +31,21 @@ func NewMemoryStorage() *MemoryStorage {
 	}
 }
 
-// metrics.Value = Gauge
-// metrics.Delta = Counter
 func (ms *MemoryStorage) GetAllMetrics() []string {
 	result := make([]string, 0, len(ms.Metrics))
-	for _, metric := range ms.Metrics {
-		if *metric.Value != 0 || *metric.Delta != 0 {
-			var value string
-			if metric.MType == config.Counter {
+	for id, metric := range ms.Metrics {
+		var value string
+		if metric.MType == config.Counter && metric.Delta != nil {
+			if *metric.Delta != 0 {
 				value = strconv.FormatInt(*metric.Delta, 10)
-			} else {
+			}
+		} else if metric.MType == config.Gauge && metric.Value != nil {
+			if *metric.Value != 0 {
 				value = strconv.FormatFloat(*metric.Value, 'f', -1, 64)
 			}
-			result = append(result, fmt.Sprintf("%s: %s", metric.ID, value))
+		}
+		if value != "" {
+			result = append(result, fmt.Sprintf("%s: %s", id, value))
 		}
 	}
 	return result
