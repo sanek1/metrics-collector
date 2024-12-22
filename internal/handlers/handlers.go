@@ -25,9 +25,6 @@ func (ms MetricStorage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.
 	nameMetric := chi.URLParam(r, "*")
 
 	ms.Logger.Infoln(
-		"uri", r.RequestURI,
-		"method", r.Method,
-		"Content-Type", r.Header.Get("Content-Type"),
 		"hander", "GetMetricsByNameHandler",
 		"typeMetric", typeMetric,
 		"nameMetric", nameMetric,

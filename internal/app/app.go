@@ -25,7 +25,7 @@ func New(addr string) *App {
 
 func (a *App) Run() error {
 	// init zap logger
-	if _, err := v.Initialize("test_level"); err != nil {
+	if _, err := v.Initialize("info"); err != nil {
 		return err
 	}
 	server := &http.Server{
@@ -36,6 +36,6 @@ func (a *App) Run() error {
 		IdleTimeout:       120 * time.Second,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	v.Loger.Info("Running server", zap.String("address", a.addr))
+	v.Loger.Info("Running server ", zap.String("address", a.addr))
 	return server.ListenAndServe()
 }

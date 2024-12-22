@@ -8,43 +8,36 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 
 	"github.com/sanek1/metrics-collector/internal/validation"
+	"go.uber.org/zap"
 )
 
-func SendToServer(client *http.Client, url string, m validation.Metrics, logger *log.Logger) error {
+func SendToServer(client *http.Client, url string, m validation.Metrics, logger *zap.SugaredLogger) error {
 	ctx := context.Background()
-	reqBody, err := buildMetrickBody(m)
+	body, err := json.Marshal(m)
 	if err != nil {
-		logger.Printf("Error building request body: %v", err)
+		logger.Warnln("Error building request body: %v", err)
 		return err
 	}
 	/// compress request body
-	var buf bytes.Buffer
-	zw := gzip.NewWriter(&buf)
-	if _, err := zw.Write(reqBody); err != nil {
-		panic(err)
+	compressedBody, err := compressedBody(body, logger)
+	if err != nil {
+		logger.Warnln("Error compressing request body: %v", err)
+		return err
 	}
 
-	if err := zw.Close(); err != nil {
-		panic(err)
-	}
-	compressedBody := buf.Bytes()
-	///
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(compressedBody))
 	if err != nil {
-		logger.Printf("Error creating request: %v", err)
+		logger.Warnln("Error creating request: %v", err)
 		return err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("content-encoding", "gzip")
 	req.Header.Set("Accept-Encoding", "gzip")
-	// compress request body
-
 	cookie := &http.Cookie{
 		Name:   "Token",
 		Value:  "TEST_TOKEN",
@@ -54,48 +47,74 @@ func SendToServer(client *http.Client, url string, m validation.Metrics, logger 
 
 	resp, err := client.Do(req)
 	if err != nil {
-		logger.Printf("Error sending request: %v", err)
+		logger.Warnln("Error sending request: %v", err)
 		return err
 	}
 
 	if resp.Header.Get("Content-Encoding") == "gzip" {
-		gzReader, err := gzip.NewReader(resp.Body)
+		buf, err := decompressReader(resp.Body, logger)
 		if err != nil {
-			log.Fatalf("Error reading response body: %v", err)
+			logger.Warnln("Error decompressing response body: %v", err)
+			return err
 		}
-		defer gzReader.Close()
-		buf2 := new(bytes.Buffer)
-		writer := bufio.NewWriter(buf2)
-		if _, err := io.Copy(writer, gzReader); err != nil {
-			log.Fatalf("error when copying: %v", err)
-		}
-		writer.Flush()
-
-		os.Stdout.Write(buf2.Bytes())
+		os.Stdout.Write(buf.Bytes())
 	} else {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			logger.Printf("Error reading response body: %v", err)
+			logger.Infoln("Error reading response body: %v", err)
 			return err
 		}
 		os.Stdout.Write(body)
 	}
 
-	fmt.Fprintf(os.Stdout, " Url: %s status: %d\n", url, resp.StatusCode)
-
+	fmt.Fprintf(os.Stdout, "\nUrl: %s\nStatus: %d\n", url, resp.StatusCode)
 	defer resp.Body.Close()
 
 	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
-		logger.Printf("Error discarding response body: %v", err)
+		logger.Infoln("Error discarding response body: %v", err)
 	}
 
 	return nil
 }
 
-func buildMetrickBody(m validation.Metrics) ([]byte, error) {
-	body, err := json.Marshal(m)
+func compressedBody(body []byte, logger *zap.SugaredLogger) ([]byte, error) {
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	_, err := zw.Write(body)
 	if err != nil {
+		logger.Fatal(err)
 		return nil, err
 	}
-	return body, nil
+	err = zw.Close()
+	if err != nil {
+		logger.Fatal(err)
+		return nil, err
+	}
+	compressedBody := buf.Bytes()
+	return compressedBody, err
+}
+
+func decompressReader(body io.ReadCloser, logger *zap.SugaredLogger) (*bytes.Buffer, error) {
+	const maxDecompressedSize = 10 * 1024 * 1024 // 10 MB
+
+	gzReader, err := gzip.NewReader(body)
+	if err != nil {
+		logger.Fatalf("Error reading response body: %v", err)
+	}
+	defer gzReader.Close()
+
+	buf := new(bytes.Buffer)
+	writer := bufio.NewWriter(buf)
+
+	_, err = io.CopyN(writer, gzReader, maxDecompressedSize)
+	if err != nil {
+		if err == io.EOF {
+			err = fmt.Errorf("decompressed data exceeds maximum size limit")
+		}
+		logger.Fatalf("Error when copying: %v", err)
+		return nil, err
+	}
+
+	writer.Flush()
+	return buf, nil
 }

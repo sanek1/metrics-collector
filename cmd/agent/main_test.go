@@ -2,15 +2,15 @@ package main
 
 import (
 	"fmt"
-	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/sanek1/metrics-collector/internal/services"
 	m "github.com/sanek1/metrics-collector/internal/validation"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
 func Test_reportClient(t *testing.T) {
@@ -62,12 +62,12 @@ func Test_reportClient(t *testing.T) {
 			rw.Header().Set("Content-Type", "application/json")
 			rw.Header().Set("content-encoding", "")
 			rw.Header().Set("Accept-Encoding", "")
-
 		}),
 	)
 	defer testServer.Close()
-
-	logger := log.New(io.Discard, "", log.LstdFlags)
+	//logger := log.New(io.Discard, "", log.LstdFlags)
+	logger, _ := m.Initialize("info")
+	logger.Info("agent started ", zap.String("time: ", time.DateTime))
 
 	for _, tt := range tests {
 		t.Run(tt.ID, func(t *testing.T) {

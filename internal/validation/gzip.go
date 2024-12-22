@@ -6,6 +6,10 @@ import (
 	"net/http"
 )
 
+const (
+	code = 300
+)
+
 // compressWriter implement interface http.ResponseWriter and for server
 // compress data and set http.ResponseWriter
 type compressWriter struct {
@@ -29,7 +33,7 @@ func (c *compressWriter) Write(p []byte) (int, error) {
 }
 
 func (c *compressWriter) WriteHeader(statusCode int) {
-	if statusCode < 300 {
+	if statusCode < code {
 		c.w.Header().Set("Content-Encoding", "gzip")
 	}
 	c.w.WriteHeader(statusCode)

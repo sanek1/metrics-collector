@@ -5,6 +5,7 @@ go 1.22.9
 require (
 	github.com/go-chi/chi v1.5.5
 	github.com/stretchr/testify v1.10.0
+	go.uber.org/mock v0.5.0
 	go.uber.org/zap v1.27.0
 )
 

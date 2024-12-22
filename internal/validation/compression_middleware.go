@@ -8,40 +8,36 @@ import (
 
 func GzipMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// по умолчанию устанавливаем оригинальный http.ResponseWriter как тот,
-		// который будем передавать следующей функции
 		ow := w
 
-		// проверяем, что клиент умеет получать от сервера сжатые данные в формате gzip
+		// we check that client can receive compressed data in gzip format from server
 		acceptEncoding := r.Header.Get("Accept-Encoding")
 		supportsGzip := strings.Contains(acceptEncoding, "gzip")
 		if supportsGzip {
-			// оборачиваем оригинальный http.ResponseWriter новым с поддержкой сжатия
+			// wrap the original http.ResponseWriter with a new one with compression support
 			cw := NewCompressWriter(w)
-			// меняем оригинальный http.ResponseWriter на новый
+			// change the original http.ResponseWriter to a new one
 			ow = cw
-			// не забываем отправить клиенту все сжатые данные после завершения middleware
+			// send all compressed data to client after middleware completes
 			defer cw.Close()
 		}
 
-		// проверяем, что клиент отправил серверу сжатые данные в формате gzip
+		// check that the client sent server compressed data in gzip format
 		contentEncoding := r.Header.Get("Content-Encoding")
 		sendsGzip := strings.Contains(contentEncoding, "gzip")
 		if sendsGzip {
-			// оборачиваем тело запроса в io.Reader с поддержкой декомпрессии
+			// wrap the request body in io.Reader with decompression support
 			cr, err := NewCompressReader(r.Body)
 			if err != nil {
-
 				log.Printf("Error decompressing request body: %v", err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			// меняем тело запроса на новое
+			// swaps body
 			r.Body = cr
 			defer cr.Close()
 		}
-
-		// передаём управление хендлеру
+		// return control to handler
 		h.ServeHTTP(ow, r)
 	})
 }

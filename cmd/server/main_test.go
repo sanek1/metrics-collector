@@ -49,7 +49,6 @@ func TestRouter(t *testing.T) {
 		//{"/update/gauge/Alloc/77.7.", "", "No request body\n", http.StatusBadRequest},
 	}
 	for _, v := range testTable {
-
 		t.Run("sends_gzip", func(t *testing.T) {
 			buf := bytes.NewBuffer(nil)
 			zb := gzip.NewWriter(buf)
