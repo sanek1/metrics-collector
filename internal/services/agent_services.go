@@ -95,7 +95,7 @@ func compressedBody(body []byte, logger *zap.SugaredLogger) ([]byte, error) {
 }
 
 func decompressReader(body io.ReadCloser, logger *zap.SugaredLogger) (*bytes.Buffer, error) {
-	const maxDecompressedSize = 10 * 1024 * 1024 // 10 MB
+	const maxDecompressedSize = 20 // 20 MB
 
 	gzReader, err := gzip.NewReader(body)
 	if err != nil {
