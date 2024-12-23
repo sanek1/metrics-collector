@@ -26,5 +26,5 @@ func TestSendingGaugeMetrics(t *testing.T) {
 	//expectedURL1 := "http://localhost:8080/update/gauge/gauge1/10.500000"
 	//expectedURL2 := "http://localhost:8080/update/gauge/gauge2/20.750000"
 
-	SendingGaugeMetrics(metrics, client, logger, opt.FlagRunAddr)
+	SendingGaugeMetrics(metrics, client, logger.Logger, opt.FlagRunAddr)
 }

@@ -8,9 +8,34 @@ import (
 	v "github.com/sanek1/metrics-collector/internal/validation"
 )
 
-func InitRouting(ms h.MetricStorage) http.Handler {
+type Controller struct {
+	r chi.Router
+	l *v.ZapLogger
+}
+
+func New(logger *v.ZapLogger) *Controller {
+	return &Controller{
+		l: logger,
+		r: chi.NewRouter(),
+	}
+}
+
+func (c *Controller) recover(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				c.l.WithLogging(next)
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			}
+		}()
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (c *Controller) InitRouting(ms h.MetricStorage) http.Handler {
 	r := chi.NewRouter()
-	r.Use(v.WithLogging, v.GzipMiddleware)
+	r.Use(c.recover, v.GzipMiddleware)
 
 	r.Route("/", func(r chi.Router) {
 		// Get routes

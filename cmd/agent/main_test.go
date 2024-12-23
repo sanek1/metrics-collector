@@ -67,12 +67,12 @@ func Test_reportClient(t *testing.T) {
 	defer testServer.Close()
 	//logger := log.New(io.Discard, "", log.LstdFlags)
 	logger, _ := m.Initialize("info")
-	logger.Info("agent started ", zap.String("time: ", time.DateTime))
+	logger.Logger.Info("agent started ", zap.String("time: ", time.DateTime))
 
 	for _, tt := range tests {
 		t.Run(tt.ID, func(t *testing.T) {
 			metricURL := fmt.Sprint(testServer.URL, "/update/gauge/"+tt.ID+"/"+fmt.Sprintf("%f", *tt.Value))
-			err := services.SendToServer(&http.Client{}, metricURL, tt, logger)
+			err := services.SendToServer(&http.Client{}, metricURL, tt, logger.Logger)
 			assert.Equal(t, err, nil)
 		})
 	}

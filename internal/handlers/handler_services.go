@@ -11,7 +11,6 @@ import (
 
 	c "github.com/sanek1/metrics-collector/internal/config"
 	v "github.com/sanek1/metrics-collector/internal/validation"
-	"go.uber.org/zap"
 )
 
 func CounterService(rw http.ResponseWriter, model *v.Metrics, ms *MetricStorage) {
@@ -55,7 +54,6 @@ func ParseMetricServices(rw http.ResponseWriter, r *http.Request) (v.Metrics, er
 	if model.MType == v.TypeGauge || model.MType == v.TypeCounter {
 		return model, nil
 	} else {
-		v.Logger.Error("unsupported request type", zap.String("type", model.MType))
 		rw.WriteHeader(http.StatusBadRequest)
 		return model, fmt.Errorf("unsupported request type")
 	}

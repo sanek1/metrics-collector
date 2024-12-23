@@ -8,14 +8,13 @@ import (
 
 	"github.com/sanek1/metrics-collector/internal/config"
 	m "github.com/sanek1/metrics-collector/internal/validation"
-	"go.uber.org/zap"
 )
 
 // testcounter [ {"id": "counter1", "type": "counter", "delta": 1, "value": 123.4}]
 // testSetGet32 [ {"id": "testSetGet33", "type": "gauge", "delta": 1, "value": 123.4}
 type MemoryStorage struct {
 	Metrics map[string]m.Metrics
-	Logger  *zap.SugaredLogger
+	Logger  *m.ZapLogger
 }
 
 // NewMemoryStorage returns a new MemoryStorage instance.
@@ -83,7 +82,7 @@ func (ms *MemoryStorage) SetGauge(model m.Metrics) bool {
 
 func setLog(ms *MemoryStorage, model *m.Metrics, name string) {
 	before, after := ms.Metrics[model.ID], *model
-	ms.Logger.Infoln(
+	ms.Logger.Logger.Infoln(
 		"hander", name,
 		"before", formatMetric(before),
 		"after", formatMetric(after),
@@ -107,9 +106,6 @@ func (ms *MemoryStorage) SaveToFile(fname string) error {
 
 func (ms *MemoryStorage) LoadFromFile(filename string) error {
 	content, err := os.ReadFile(filename)
-	if err != nil {
-		return err
-	}
 	if err != nil {
 		if os.IsNotExist(err) {
 			fmt.Println("Data file not found. Let's start with empty values.")

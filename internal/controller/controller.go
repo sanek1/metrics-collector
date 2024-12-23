@@ -18,12 +18,13 @@ func New() *Controller {
 	storageImpl := storage.NewMemoryStorage()
 	metricStorage := handlers.MetricStorage{
 		Storage: storageImpl,
-		Logger:  storageImpl.Logger,
+		Logger:  storageImpl.Logger.Logger,
 	}
+	r := routing.New(storageImpl.Logger)
 
 	return &Controller{
 		metricStorage: metricStorage,
-		router:        routing.InitRouting(metricStorage),
+		router:        r.InitRouting(metricStorage),
 	}
 }
 

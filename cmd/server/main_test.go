@@ -28,7 +28,7 @@ func TestRouter(t *testing.T) {
 	memStorage := s.NewMemoryStorage()
 	metricStorage := h.MetricStorage{
 		Storage: memStorage,
-		Logger:  memStorage.Logger,
+		Logger:  memStorage.Logger.Logger,
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -80,7 +80,7 @@ func TestGzipCompression(t *testing.T) {
 	storageImpl := s.NewMemoryStorage()
 	metricStorage := h.MetricStorage{
 		Storage: storageImpl,
-		Logger:  storageImpl.Logger,
+		Logger:  storageImpl.Logger.Logger,
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

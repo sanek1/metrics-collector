@@ -46,7 +46,7 @@ func (a *App) Run() error {
 		IdleTimeout:       120 * time.Second,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	loger.Info("Running server ", zap.String("address", a.addr))
+	loger.Logger.Info("Running server ", zap.String("address", a.addr))
 	go a.controller.PeriodicallySaveBackUp(a.path, a.restore, time.Duration(a.storeInterval)*time.Second)
 	return server.ListenAndServe()
 }

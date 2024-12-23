@@ -42,8 +42,8 @@ func initLogger() (*zap.SugaredLogger, error) {
 	if err != nil {
 		return nil, err
 	}
-	logger.Info("agent started ", zap.String("time: ", time.DateTime))
-	return logger, nil
+	logger.Logger.Info("agent started ", zap.String("time: ", time.DateTime))
+	return logger.Logger, nil
 }
 
 func initDataAgent(opt *flags.Options) (pollTick, reportTick *time.Ticker, metrics map[string]float64) {

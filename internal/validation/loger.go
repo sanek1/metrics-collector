@@ -9,7 +9,10 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var Logger zap.SugaredLogger
+type ZapLogger struct {
+	Logger *zap.SugaredLogger
+	level  zap.AtomicLevel
+}
 
 type (
 	responseData struct {
@@ -34,7 +37,7 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 	r.responseData.status = statusCode
 }
 
-func Initialize(level string) (*zap.SugaredLogger, error) {
+func Initialize(level string) (*ZapLogger, error) {
 	atomicLevel := zap.NewAtomicLevel()
 	atomicLevel.SetLevel(zap.InfoLevel)
 
@@ -58,11 +61,12 @@ func Initialize(level string) (*zap.SugaredLogger, error) {
 		atomicLevel,
 	))
 
-	Logger = *logger.Sugar()
-	return &Logger, nil
+	l := logger.Sugar()
+
+	return &ZapLogger{Logger: l, level: atomicLevel}, nil
 }
 
-func WithLogging(h http.Handler) http.Handler {
+func (z ZapLogger) WithLogging(next http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
@@ -74,10 +78,10 @@ func WithLogging(h http.Handler) http.Handler {
 			ResponseWriter: w,
 			responseData:   responseData,
 		}
-		h.ServeHTTP(&lw, r)
+		next.ServeHTTP(&lw, r)
 		duration := time.Since(start)
 
-		Logger.Infoln(
+		z.Logger.Infoln(
 			"uri", r.RequestURI,
 			"method", r.Method,
 			"status", responseData.status,
