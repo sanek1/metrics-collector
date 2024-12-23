@@ -55,7 +55,7 @@ func ParseMetricServices(rw http.ResponseWriter, r *http.Request) (v.Metrics, er
 	if model.MType == v.TypeGauge || model.MType == v.TypeCounter {
 		return model, nil
 	} else {
-		v.Loger.Error("unsupported request type", zap.String("type", model.MType))
+		v.Logger.Error("unsupported request type", zap.String("type", model.MType))
 		rw.WriteHeader(http.StatusBadRequest)
 		return model, fmt.Errorf("unsupported request type")
 	}

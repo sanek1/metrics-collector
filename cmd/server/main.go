@@ -9,7 +9,7 @@ import (
 func main() {
 	ParseFlags()
 
-	application := app.New(Options.flagRunAddr)
+	application := app.New(Options.flagRunAddr, Options.storeInterval, Options.path, Options.restore)
 	if err := application.Run(); err != nil {
 		log.Fatal(err)
 	}

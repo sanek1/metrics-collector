@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi"
 )
@@ -82,6 +83,16 @@ func (ms MetricStorage) GetMetricsHandler(rw http.ResponseWriter, r *http.Reques
 		http.Error(rw, "No such value exists", http.StatusNotFound)
 		return
 	}
+}
+
+func (ms MetricStorage) SaveToFile(fname string) error {
+	// serialize to json
+	data, err := json.MarshalIndent(ms.Storage, "", "   ")
+	if err != nil {
+		return err
+	}
+	// save to file
+	return os.WriteFile(fname, data, 0600)
 }
 
 func NotImplementedHandler(rw http.ResponseWriter, r *http.Request) {

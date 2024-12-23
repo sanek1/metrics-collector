@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strconv"
 
 	"github.com/sanek1/metrics-collector/internal/config"
@@ -89,7 +90,44 @@ func setLog(ms *MemoryStorage, model *m.Metrics, name string) {
 	)
 }
 
+func (ms *MemoryStorage) SaveToFile(fname string) error {
+	// serialize to json
+	data, err := json.MarshalIndent(ms.Metrics, "", "   ")
+	if err != nil {
+		return err
+	}
+	// save to file
+	err = os.WriteFile(fname, data, 0600)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Data saved to file: %s\n", fname)
+	return nil
+}
+
+func (ms *MemoryStorage) LoadFromFile(filename string) error {
+	content, err := os.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println("Data file not found. Let's start with empty values.")
+			return nil
+		}
+		return fmt.Errorf("file read error: %v", err)
+	}
+
+	err = json.Unmarshal(content, &ms.Metrics)
+	if err != nil {
+		return fmt.Errorf("data unmarshalling error: %v", err)
+	}
+
+	fmt.Println("Previous metric values have been loaded.")
+	return nil
+}
+
 func formatMetric(model m.Metrics) string {
-	data, _ := json.Marshal(model) // Игнорируем ошибку для упрощения примера
+	data, _ := json.Marshal(model) //
 	return string(data)
 }
