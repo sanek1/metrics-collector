@@ -10,6 +10,10 @@ import (
 	m "github.com/sanek1/metrics-collector/internal/validation"
 )
 
+const (
+	fileMode = 0600
+)
+
 // testcounter [ {"id": "counter1", "type": "counter", "delta": 1, "value": 123.4}]
 // testSetGet32 [ {"id": "testSetGet33", "type": "gauge", "delta": 1, "value": 123.4}
 type MemoryStorage struct {
@@ -96,7 +100,7 @@ func (ms *MemoryStorage) SaveToFile(fname string) error {
 		return err
 	}
 	// save to file
-	err = os.WriteFile(fname, data, 0600)
+	err = os.WriteFile(fname, data, fileMode)
 	if err != nil {
 		return err
 	}

@@ -10,6 +10,10 @@ import (
 	"github.com/go-chi/chi"
 )
 
+const (
+	fileMode = 0600
+)
+
 func (ms MetricStorage) MainPageHandler(rw http.ResponseWriter, r *http.Request) {
 	metrics := ms.Storage.GetAllMetrics()
 	htmlData := GenerateHTMLServices(metrics)
@@ -92,7 +96,7 @@ func (ms MetricStorage) SaveToFile(fname string) error {
 		return err
 	}
 	// save to file
-	return os.WriteFile(fname, data, 0600)
+	return os.WriteFile(fname, data, fileMode)
 }
 
 func NotImplementedHandler(rw http.ResponseWriter, r *http.Request) {
