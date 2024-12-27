@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/sanek1/metrics-collector/internal/services"
 	m "github.com/sanek1/metrics-collector/internal/validation"
+	l "github.com/sanek1/metrics-collector/pkg/logging"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -24,35 +26,30 @@ func Test_reportClient(t *testing.T) {
 			ID:    "Alloc",
 			MType: "gauge",
 			Value: &value1,
-			//url:   "/update1/gauge/Alloc/123",
 		},
 		{
 			ID:    "BuckHashSys",
 			MType: "gauge",
 			Delta: nil,
 			Value: &value2,
-			//url:   "/up2ate/gauge/BuckHashSys/-123",
 		},
 		{
 			ID:    "Frees",
 			MType: "gauge",
 			Delta: nil,
 			Value: &value3,
-			//url:   "/update/gauge/Frees/0",
 		},
 		{
 			ID:    "GCCPUFraction",
 			MType: "gauge",
 			Delta: nil,
 			Value: &value4,
-			//url:   "/update/gauge/GCCPUFraction/0",
 		},
 		{
 			ID:    "wrong path",
 			MType: "gauge",
 			Delta: nil,
 			Value: &value4,
-			//url:   "/update111/gauge/GCCPUFraction/0",
 		},
 	}
 
@@ -65,14 +62,14 @@ func Test_reportClient(t *testing.T) {
 		}),
 	)
 	defer testServer.Close()
-	//logger := log.New(io.Discard, "", log.LstdFlags)
-	logger, _ := m.Initialize("info")
-	logger.Logger.Info("agent started ", zap.String("time: ", time.DateTime))
+	ctx := context.Background()
+	logger, _ := l.NewZapLogger(zap.InfoLevel)
+	logger.InfoCtx(ctx, "agent started ", zap.String("time: ", time.DateTime))
 
 	for _, tt := range tests {
 		t.Run(tt.ID, func(t *testing.T) {
 			metricURL := fmt.Sprint(testServer.URL, "/update/gauge/"+tt.ID+"/"+fmt.Sprintf("%f", *tt.Value))
-			err := services.SendToServer(&http.Client{}, metricURL, tt, logger.Logger)
+			err := services.SendToServer(&http.Client{}, metricURL, tt, logger)
 			assert.Equal(t, err, nil)
 		})
 	}

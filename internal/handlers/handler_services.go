@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	con "context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,25 +12,29 @@ import (
 
 	c "github.com/sanek1/metrics-collector/internal/config"
 	v "github.com/sanek1/metrics-collector/internal/validation"
+	"go.uber.org/zap"
 )
 
-func CounterService(rw http.ResponseWriter, model *v.Metrics, ms *MetricStorage) {
-	newmodel := ms.Storage.SetCounter(*model)
+func CounterService(ctx con.Context, rw http.ResponseWriter, model *v.Metrics, ms *MetricStorage) {
+	newmodel := ms.Storage.SetCounter(ctx, *model)
 	resp, err := json.Marshal(newmodel)
 	if err != nil {
+		ms.Logger.ErrorCtx(ctx, "The metric was not parsed", zap.Any("err", err.Error()))
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	SendResultStatusOK(rw, resp)
 }
 
-func GaugeService(rw http.ResponseWriter, model *v.Metrics, ms *MetricStorage) {
-	if ok := ms.Storage.SetGauge(*model); !ok {
+func GaugeService(ctx con.Context, rw http.ResponseWriter, model *v.Metrics, ms *MetricStorage) {
+	if ok := ms.Storage.SetGauge(ctx, *model); !ok {
+		ms.Logger.ErrorCtx(ctx, "The metric was not saved", zap.Any("err", "no such value exists"))
 		http.Error(rw, "No such value exists", http.StatusNotFound)
 		return
 	}
 	resp, err := json.Marshal(model)
 	if err != nil {
+		ms.Logger.ErrorCtx(ctx, "The metric was not marshaled", zap.Any("err", err.Error()))
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}

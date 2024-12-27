@@ -6,14 +6,16 @@ import (
 	"github.com/go-chi/chi"
 	h "github.com/sanek1/metrics-collector/internal/handlers"
 	v "github.com/sanek1/metrics-collector/internal/validation"
+	l "github.com/sanek1/metrics-collector/pkg/logging"
+	"go.uber.org/zap"
 )
 
 type Controller struct {
 	r chi.Router
-	l *v.ZapLogger
+	l *l.ZapLogger
 }
 
-func New(logger *v.ZapLogger) *Controller {
+func New(logger *l.ZapLogger) *Controller {
 	return &Controller{
 		l: logger,
 		r: chi.NewRouter(),
@@ -24,7 +26,7 @@ func (c *Controller) recover(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if rec := recover(); rec != nil {
-				c.l.WithLogging(next)
+				c.l.PanicCtx(r.Context(), "recovered from panic", zap.Any("panic", rec))
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			}
 		}()

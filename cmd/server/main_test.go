@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,7 +12,9 @@ import (
 	h "github.com/sanek1/metrics-collector/internal/handlers"
 	s "github.com/sanek1/metrics-collector/internal/storage"
 	v "github.com/sanek1/metrics-collector/internal/validation"
+	"github.com/sanek1/metrics-collector/pkg/logging"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 type testTable struct {
@@ -22,13 +25,15 @@ type testTable struct {
 }
 
 func TestRouter(t *testing.T) {
-	if _, err := v.Initialize("test_level"); err != nil {
-		return
+	l, err := logging.NewZapLogger(zap.InfoLevel)
+
+	if err != nil {
+		log.Panic(err)
 	}
-	memStorage := s.NewMemoryStorage()
+	memStorage := s.NewMemoryStorage(l)
 	metricStorage := h.MetricStorage{
 		Storage: memStorage,
-		Logger:  memStorage.Logger.Logger,
+		Logger:  memStorage.Logger,
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -77,10 +82,16 @@ func TestRouter(t *testing.T) {
 }
 
 func TestGzipCompression(t *testing.T) {
-	storageImpl := s.NewMemoryStorage()
+	l, err := logging.NewZapLogger(zap.InfoLevel)
+
+	if err != nil {
+		log.Panic(err)
+	}
+
+	storageImpl := s.NewMemoryStorage(l)
 	metricStorage := h.MetricStorage{
 		Storage: storageImpl,
-		Logger:  storageImpl.Logger.Logger,
+		Logger:  storageImpl.Logger,
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

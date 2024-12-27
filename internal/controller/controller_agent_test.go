@@ -1,19 +1,22 @@
 package controller
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
 	"github.com/sanek1/metrics-collector/internal/flags"
-	v "github.com/sanek1/metrics-collector/internal/validation"
+	l "github.com/sanek1/metrics-collector/pkg/logging"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
 )
 
 func TestSendingGaugeMetrics(t *testing.T) {
+	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	logger, _ := v.Initialize("info")
+	logger, _ := l.NewZapLogger(zap.InfoLevel)
 
 	client := &http.Client{}
 	opt := &flags.Options{FlagRunAddr: ":8080"}
@@ -26,5 +29,5 @@ func TestSendingGaugeMetrics(t *testing.T) {
 	//expectedURL1 := "http://localhost:8080/update/gauge/gauge1/10.500000"
 	//expectedURL2 := "http://localhost:8080/update/gauge/gauge2/20.750000"
 
-	SendingGaugeMetrics(metrics, client, logger.Logger, opt.FlagRunAddr)
+	SendingGaugeMetrics(ctx, metrics, client, logger, opt.FlagRunAddr)
 }
