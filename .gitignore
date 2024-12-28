@@ -27,3 +27,4 @@ vendor/
 .idea
 .vscode
 /cmd/server/File_Log_Store.json
+/internal/controller/File_Log_Store.json

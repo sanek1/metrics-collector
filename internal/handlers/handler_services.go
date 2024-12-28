@@ -11,11 +11,11 @@ import (
 	"strings"
 
 	c "github.com/sanek1/metrics-collector/internal/config"
-	v "github.com/sanek1/metrics-collector/internal/validation"
+	m "github.com/sanek1/metrics-collector/internal/models"
 	"go.uber.org/zap"
 )
 
-func CounterService(ctx con.Context, rw http.ResponseWriter, model *v.Metrics, ms *MetricStorage) {
+func CounterService(ctx con.Context, rw http.ResponseWriter, model *m.Metrics, ms *MetricStorage) {
 	newmodel := ms.Storage.SetCounter(ctx, *model)
 	resp, err := json.Marshal(newmodel)
 	if err != nil {
@@ -26,7 +26,7 @@ func CounterService(ctx con.Context, rw http.ResponseWriter, model *v.Metrics, m
 	SendResultStatusOK(rw, resp)
 }
 
-func GaugeService(ctx con.Context, rw http.ResponseWriter, model *v.Metrics, ms *MetricStorage) {
+func GaugeService(ctx con.Context, rw http.ResponseWriter, model *m.Metrics, ms *MetricStorage) {
 	if ok := ms.Storage.SetGauge(ctx, *model); !ok {
 		ms.Logger.ErrorCtx(ctx, "The metric was not saved", zap.Any("err", "no such value exists"))
 		http.Error(rw, "No such value exists", http.StatusNotFound)
@@ -41,8 +41,8 @@ func GaugeService(ctx con.Context, rw http.ResponseWriter, model *v.Metrics, ms 
 	SendResultStatusOK(rw, resp)
 }
 
-func ParseMetricServices(rw http.ResponseWriter, r *http.Request) (v.Metrics, error) {
-	var model v.Metrics
+func ParseMetricServices(rw http.ResponseWriter, r *http.Request) (m.Metrics, error) {
+	var model m.Metrics
 	if r.ContentLength == 0 {
 		if err := buildJSONBody(rw, r); err != nil {
 			return model, err
@@ -56,7 +56,7 @@ func ParseMetricServices(rw http.ResponseWriter, r *http.Request) (v.Metrics, er
 		return model, err
 	}
 
-	if model.MType == v.TypeGauge || model.MType == v.TypeCounter {
+	if model.MType == m.TypeGauge || model.MType == m.TypeCounter {
 		return model, nil
 	} else {
 		rw.WriteHeader(http.StatusBadRequest)
@@ -100,7 +100,7 @@ func buildJSONBody(rw http.ResponseWriter, r *http.Request) (err error) {
 		return err
 	}
 	intVal := int64(*val)
-	model := v.Metrics{
+	model := m.Metrics{
 		ID:    name,
 		MType: key,
 		Delta: &intVal,

@@ -18,7 +18,7 @@ const (
 
 func Run(opt *flags.Options) error {
 	ctx := context.Background()
-	logger, _ := initLogger()
+	logger, _ := InitLogger()
 	pollTick, reportTick, metrics := initDataAgent(opt)
 	client := &http.Client{}
 	var pollCount int64 = 0
@@ -39,7 +39,7 @@ func Run(opt *flags.Options) error {
 	}
 }
 
-func initLogger() (*l.ZapLogger, error) {
+func InitLogger() (*l.ZapLogger, error) {
 	logger, err := l.NewZapLogger(zap.InfoLevel)
 	if err != nil {
 		return nil, err

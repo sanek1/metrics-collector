@@ -11,12 +11,12 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/sanek1/metrics-collector/internal/validation"
+	"github.com/sanek1/metrics-collector/internal/models"
 	"github.com/sanek1/metrics-collector/pkg/logging"
 	"go.uber.org/zap"
 )
 
-func SendToServer(client *http.Client, url string, m validation.Metrics, l *logging.ZapLogger) error {
+func SendToServer(client *http.Client, url string, m models.Metrics, l *logging.ZapLogger) error {
 	ctx := context.Background()
 	body, err := json.Marshal(m)
 	if err != nil {

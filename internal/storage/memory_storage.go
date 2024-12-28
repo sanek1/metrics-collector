@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/sanek1/metrics-collector/internal/config"
-	m "github.com/sanek1/metrics-collector/internal/validation"
+	m "github.com/sanek1/metrics-collector/internal/models"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
 	"go.uber.org/zap"
 )
@@ -83,7 +83,7 @@ func (ms *MemoryStorage) SetGauge(ctx context.Context, model m.Metrics) bool {
 }
 
 func setLog(ctx context.Context, ms *MemoryStorage, model *m.Metrics, name string) {
-	ms.Logger.InfoCtx(ctx, "message", zap.String(name, fmt.Sprintf("model%s", formatMetric(*model))))
+	ms.Logger.InfoCtx(ctx, name, zap.String(name, fmt.Sprintf("model%s", formatMetric(*model))))
 }
 
 func (ms *MemoryStorage) SaveToFile(fname string) error {

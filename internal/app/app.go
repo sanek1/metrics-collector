@@ -57,6 +57,7 @@ func startLogger() *logging.ZapLogger {
 }
 
 func (a *App) Run() error {
+	ctx := context.Background()
 	server := &http.Server{
 		Addr:              a.addr,
 		Handler:           a.controller.Router(),
@@ -66,6 +67,6 @@ func (a *App) Run() error {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	a.logger.InfoCtx(context.Background(), "Running server", zap.String("address%s", a.addr))
-	go a.controller.PeriodicallySaveBackUp(a.path, a.restore, time.Duration(a.storeInterval)*time.Second)
+	go a.controller.PeriodicallySaveBackUp(ctx, a.path, a.restore, time.Duration(a.storeInterval)*time.Second)
 	return server.ListenAndServe()
 }

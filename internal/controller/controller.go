@@ -35,13 +35,13 @@ func (c *Controller) Router() http.Handler {
 	return c.router
 }
 
-func (c *Controller) PeriodicallySaveBackUp(filename string, restore bool, interval time.Duration) {
-	ctx := context.Background()
+func (c *Controller) PeriodicallySaveBackUp(ctx context.Context, filename string, restore bool, interval time.Duration) {
 	ctx = c.metricStorage.Logger.WithContextFields(ctx,
 		zap.String("app", "logging"),
 		zap.String("service", "main"))
 
 	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 	if restore {
 		err := c.metricStorage.Storage.LoadFromFile(filename)
 		if err != nil {
@@ -54,6 +54,21 @@ func (c *Controller) PeriodicallySaveBackUp(filename string, restore bool, inter
 		c.metricStorage.Logger.InfoCtx(ctx, "saving to file was successful")
 		if err != nil {
 			c.metricStorage.Logger.ErrorCtx(ctx, "Error saving metrics to file"+err.Error())
+		}
+	}
+
+	for {
+		select {
+		case <-ticker.C:
+			err := c.metricStorage.Storage.SaveToFile(filename)
+			c.metricStorage.Logger.InfoCtx(ctx, "saving to file was successful")
+			if err != nil {
+				c.metricStorage.Logger.ErrorCtx(ctx, "Error saving metrics to file"+err.Error())
+			}
+
+		case <-ctx.Done():
+			c.metricStorage.Logger.InfoCtx(ctx, "Backup process stopped.")
+			return
 		}
 	}
 }

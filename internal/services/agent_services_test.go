@@ -1,4 +1,4 @@
-package main
+package services
 
 import (
 	"context"
@@ -8,8 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sanek1/metrics-collector/internal/services"
-	m "github.com/sanek1/metrics-collector/internal/validation"
+	m "github.com/sanek1/metrics-collector/internal/models"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
@@ -69,7 +68,7 @@ func Test_reportClient(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.ID, func(t *testing.T) {
 			metricURL := fmt.Sprint(testServer.URL, "/update/gauge/"+tt.ID+"/"+fmt.Sprintf("%f", *tt.Value))
-			err := services.SendToServer(&http.Client{}, metricURL, tt, logger)
+			err := SendToServer(&http.Client{}, metricURL, tt, logger)
 			assert.Equal(t, err, nil)
 		})
 	}

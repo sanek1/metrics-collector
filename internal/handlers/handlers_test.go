@@ -9,8 +9,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	m "github.com/sanek1/metrics-collector/internal/models"
 	"github.com/sanek1/metrics-collector/internal/storage"
-	v "github.com/sanek1/metrics-collector/internal/validation"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,12 +23,12 @@ func TestGetMetricsByBody(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		model          v.Metrics
+		model          m.Metrics
 		expectedStatus int
 	}{
 		{
 			name: "counter",
-			model: v.Metrics{
+			model: m.Metrics{
 				ID:    "test1",
 				MType: "counter",
 				Delta: &value2,
@@ -37,7 +37,7 @@ func TestGetMetricsByBody(t *testing.T) {
 		},
 		{
 			name: "gauge",
-			model: v.Metrics{
+			model: m.Metrics{
 				ID:    "test2",
 				MType: "gauge",
 				Value: &value1,
@@ -57,7 +57,7 @@ func TestGetMetricsByBody(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ms := MetricStorage{
 				Storage: &storage.MemoryStorage{
-					Metrics: make(map[string]v.Metrics),
+					Metrics: make(map[string]m.Metrics),
 					Logger:  l,
 				},
 			}

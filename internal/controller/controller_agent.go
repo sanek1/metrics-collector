@@ -7,8 +7,8 @@ import (
 	"os"
 
 	"github.com/sanek1/metrics-collector/internal/flags"
+	m "github.com/sanek1/metrics-collector/internal/models"
 	"github.com/sanek1/metrics-collector/internal/services"
-	"github.com/sanek1/metrics-collector/internal/validation"
 	"github.com/sanek1/metrics-collector/pkg/logging"
 	"go.uber.org/zap"
 )
@@ -29,7 +29,7 @@ func ReportMetrics(ctx context.Context,
 
 func sendingCounterMetrics(ctx context.Context, pollCount *int64, client *http.Client, l *logging.ZapLogger, addr string) {
 	metricURL := fmt.Sprintf("http://%s/update/counter/PollCount/%d", addr, *pollCount)
-	metricCounter := validation.NewMetricCounter("PollCount", pollCount)
+	metricCounter := m.NewMetricCounter("PollCount", pollCount)
 	if err := services.SendToServer(client, metricURL, *metricCounter, l); err != nil {
 		l.InfoCtx(ctx, "message", zap.String("sendingCounterMetrics", fmt.Sprintf("Error reporting metrics%v", err)))
 	}
@@ -38,7 +38,7 @@ func sendingCounterMetrics(ctx context.Context, pollCount *int64, client *http.C
 func SendingGaugeMetrics(ctx context.Context, metrics map[string]float64, client *http.Client, l *logging.ZapLogger, addr string) {
 	for name, v := range metrics {
 		metricURL := fmt.Sprintf("http://%s/update/gauge/%s/%f", addr, name, v)
-		metricGauge := validation.NewMetricGauge(name, &v)
+		metricGauge := m.NewMetricGauge(name, &v)
 		if err := services.SendToServer(client, metricURL, *metricGauge, l); err != nil {
 			l.InfoCtx(ctx, "message", zap.String("SendingGaugeMetrics", fmt.Sprintf("Error reporting metrics%v", err)))
 		}

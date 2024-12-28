@@ -3,7 +3,7 @@ package storage
 import (
 	"context"
 
-	m "github.com/sanek1/metrics-collector/internal/validation"
+	m "github.com/sanek1/metrics-collector/internal/models"
 )
 
 type Storage interface {

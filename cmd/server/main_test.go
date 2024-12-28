@@ -46,12 +46,7 @@ func TestRouter(t *testing.T) {
 	var testTable = []testTable{
 		{"/update/counter/Mallocs/777", `{"id": "test_Mallocs", "type": "counter", "delta": 5, "value": 123.4}`, `{"id":"test_Mallocs","type":"counter","delta":5}`, http.StatusOK},
 		{"/update/counter/Mallocs/777", `{"id": "test_Mallocs", "type": "counter", "delta": 6, "value": 123.4}`, `{"id":"test_Mallocs","type":"counter","delta":11}`, http.StatusOK}, // expected 5+5=10
-
 		{"/update/gauge/Alloc/777", `{"id": "test_Alloc", "type": "gauge", "delta": 6, "value": 123.4}`, `{"id":"test_Alloc","type":"gauge","delta":6,"value":123.4}`, http.StatusOK},
-		//bad response
-		//{"/update/unknown/Mallocs/7", "", `{"error": "failed to read body"}`, http.StatusBadRequest},
-		//{"/update1/counter/Mallocs/7", "", "Not Implemented\n", http.StatusBadRequest},
-		//{"/update/gauge/Alloc/77.7.", "", "No request body\n", http.StatusBadRequest},
 	}
 	for _, v := range testTable {
 		t.Run("sends_gzip", func(t *testing.T) {
