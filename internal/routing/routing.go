@@ -25,7 +25,6 @@ func New(logger *l.ZapLogger) *Controller {
 
 func (c *Controller) InitRouting(ms h.MetricStorage) http.Handler {
 	r := chi.NewRouter()
-	//vv := v.New(c.l)
 	r.Use(c.midleware.Recover, v.GzipMiddleware)
 
 	r.Route("/", func(r chi.Router) {
