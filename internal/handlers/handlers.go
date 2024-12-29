@@ -71,12 +71,12 @@ func (ms MetricStorage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http
 
 func (ms MetricStorage) GetMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
+
 	model, err := ParseMetricServices(rw, r)
 	ctx = ms.Logger.WithContextFields(ctx,
 		zap.String("type", model.MType))
 	if err != nil {
-		fmt.Printf("error parsing  %v\n", model)
-		ms.Logger.ErrorCtx(ctx, "The metric was not parsed2", zap.Any("err", err.Error()))
+		ms.Logger.ErrorCtx(ctx, "The metric was not parsed", zap.Any("err", err.Error()))
 		SendResultStatusNotOK(rw, []byte(`{"error": "failed to read body"}`))
 		return
 	}

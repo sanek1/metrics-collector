@@ -19,8 +19,7 @@ func CounterService(ctx con.Context, rw http.ResponseWriter, model *m.Metrics, m
 	newmodel := ms.Storage.SetCounter(ctx, *model)
 	resp, err := json.Marshal(newmodel)
 	if err != nil {
-		fmt.Printf("error parsing  %v\n", model)
-		ms.Logger.ErrorCtx(ctx, "The metric was not parsed1", zap.Any("err", err.Error()))
+		ms.Logger.ErrorCtx(ctx, "The metric was not parsed", zap.Any("err", err.Error()))
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
