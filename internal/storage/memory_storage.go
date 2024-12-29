@@ -1,13 +1,16 @@
 package storage
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
 
 	"github.com/sanek1/metrics-collector/internal/config"
-	m "github.com/sanek1/metrics-collector/internal/validation"
+	m "github.com/sanek1/metrics-collector/internal/models"
+	l "github.com/sanek1/metrics-collector/pkg/logging"
+	"go.uber.org/zap"
 )
 
 const (
@@ -18,17 +21,12 @@ const (
 // testSetGet32 [ {"id": "testSetGet33", "type": "gauge", "delta": 1, "value": 123.4}
 type MemoryStorage struct {
 	Metrics map[string]m.Metrics
-	Logger  *m.ZapLogger
+	Logger  *l.ZapLogger
 }
 
 // NewMemoryStorage returns a new MemoryStorage instance.
 // It creates an empty map of Metrics and a new Logger writing to os.Stdout.
-func NewMemoryStorage() *MemoryStorage {
-	logger, err := m.Initialize("test_level")
-	if err != nil {
-		panic(err)
-	}
-
+func NewMemoryStorage(logger *l.ZapLogger) *MemoryStorage {
 	return &MemoryStorage{
 		Metrics: make(map[string]m.Metrics),
 		Logger:  logger,
@@ -63,8 +61,8 @@ func (ms *MemoryStorage) GetMetrics(key, metricName string) (*m.Metrics, bool) {
 	return &metric, true
 }
 
-func (ms *MemoryStorage) SetCounter(model m.Metrics) m.Metrics {
-	setLog(ms, &model, "SetCounter")
+func (ms *MemoryStorage) SetCounter(ctx context.Context, model m.Metrics) m.Metrics {
+	setLog(ctx, ms, &model, "SetCounter")
 	if metric, ok := ms.Metrics[model.ID]; ok {
 		*metric.Delta += *model.Delta
 		ms.Metrics[model.ID] = metric
@@ -78,19 +76,14 @@ func (ms *MemoryStorage) SetCounter(model m.Metrics) m.Metrics {
 	return ms.Metrics[model.ID]
 }
 
-func (ms *MemoryStorage) SetGauge(model m.Metrics) bool {
-	setLog(ms, &model, "SetGauge")
+func (ms *MemoryStorage) SetGauge(ctx context.Context, model m.Metrics) bool {
+	setLog(ctx, ms, &model, "SetGauge")
 	ms.Metrics[model.ID] = m.Metrics{ID: model.ID, MType: model.MType, Value: model.Value}
 	return true
 }
 
-func setLog(ms *MemoryStorage, model *m.Metrics, name string) {
-	before, after := ms.Metrics[model.ID], *model
-	ms.Logger.Logger.Infoln(
-		"hander", name,
-		"before", formatMetric(before),
-		"after", formatMetric(after),
-	)
+func setLog(ctx context.Context, ms *MemoryStorage, model *m.Metrics, name string) {
+	ms.Logger.InfoCtx(ctx, name, zap.String(name, fmt.Sprintf("model%s", formatMetric(*model))))
 }
 
 func (ms *MemoryStorage) SaveToFile(fname string) error {

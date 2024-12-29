@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"os"
 
 	"github.com/go-chi/chi"
+	"go.uber.org/zap"
 )
 
 const (
@@ -28,12 +30,8 @@ func (ms MetricStorage) MainPageHandler(rw http.ResponseWriter, r *http.Request)
 func (ms MetricStorage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.Request) {
 	typeMetric := chi.URLParam(r, "type")
 	nameMetric := chi.URLParam(r, "*")
-
-	ms.Logger.Infoln(
-		"hander", "GetMetricsByNameHandler",
-		"typeMetric", typeMetric,
-		"nameMetric", nameMetric,
-	)
+	ms.Logger.InfoCtx(r.Context(),
+		fmt.Sprintf("handler GetMetricsByNameHandler. GetMetricsByNameHandler typeMetric %s nameMetric %s", typeMetric, nameMetric))
 
 	if m, ok := ms.Storage.GetMetrics(typeMetric, nameMetric); ok {
 		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -72,17 +70,21 @@ func (ms MetricStorage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http
 }
 
 func (ms MetricStorage) GetMetricsHandler(rw http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
 	model, err := ParseMetricServices(rw, r)
+	ctx = ms.Logger.WithContextFields(ctx,
+		zap.String("type", model.MType))
 	if err != nil {
-		ms.Logger.Error(err.Error())
+		fmt.Printf("error parsing  %v\n", model)
+		ms.Logger.ErrorCtx(ctx, "The metric was not parsed2", zap.Any("err", err.Error()))
 		SendResultStatusNotOK(rw, []byte(`{"error": "failed to read body"}`))
 		return
 	}
 	switch model.MType {
 	case "counter":
-		CounterService(rw, &model, &ms)
+		CounterService(ctx, rw, &model, &ms)
 	case "gauge":
-		GaugeService(rw, &model, &ms)
+		GaugeService(ctx, rw, &model, &ms)
 	default:
 		http.Error(rw, "No such value exists", http.StatusNotFound)
 		return

@@ -11,27 +11,28 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/sanek1/metrics-collector/internal/validation"
+	"github.com/sanek1/metrics-collector/internal/models"
+	"github.com/sanek1/metrics-collector/pkg/logging"
 	"go.uber.org/zap"
 )
 
-func SendToServer(client *http.Client, url string, m validation.Metrics, logger *zap.SugaredLogger) error {
+func SendToServer(client *http.Client, url string, m models.Metrics, l *logging.ZapLogger) error {
 	ctx := context.Background()
 	body, err := json.Marshal(m)
 	if err != nil {
-		logger.Warnln("Error building request body: %v", err)
+		l.WarnCtx(ctx, "", zap.String("", fmt.Sprintf("Error building request body:%v", err)))
 		return err
 	}
 	/// compress request body
-	compressedBody, err := compressedBody(body, logger)
+	compressedBody, err := compressedBody(ctx, body, l)
 	if err != nil {
-		logger.Warnln("Error compressing request body: %v", err)
+		l.WarnCtx(ctx, "", zap.String("", fmt.Sprintf("Error compressing request body:%v", err)))
 		return err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(compressedBody))
 	if err != nil {
-		logger.Warnln("Error creating request: %v", err)
+		l.WarnCtx(ctx, "", zap.String("", fmt.Sprintf("Error creating request:%v", err)))
 		return err
 	}
 
@@ -47,21 +48,21 @@ func SendToServer(client *http.Client, url string, m validation.Metrics, logger 
 
 	resp, err := client.Do(req)
 	if err != nil {
-		logger.Warnln("Error sending request: %v", err)
+		l.ErrorCtx(ctx, "compressedBody", zap.String("", fmt.Sprintf("Error sending request:%v", err)))
 		return err
 	}
 
 	if resp.Header.Get("Content-Encoding") == "gzip" {
-		buf, err := decompressReader(resp.Body, logger)
+		buf, err := decompressReader(ctx, resp.Body, l)
 		if err != nil {
-			logger.Warnln("Error decompressing response body: %v", err)
+			l.ErrorCtx(ctx, "compressedBody", zap.String("", fmt.Sprintf("Error decompressing response body:%v", err)))
 			return err
 		}
 		os.Stdout.Write(buf.Bytes())
 	} else {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			logger.Infoln("Error reading response body: %v", err)
+			l.ErrorCtx(ctx, "compressedBody", zap.String("", fmt.Sprintf("Error reading response body:%v", err)))
 			return err
 		}
 		os.Stdout.Write(body)
@@ -71,35 +72,35 @@ func SendToServer(client *http.Client, url string, m validation.Metrics, logger 
 	defer resp.Body.Close()
 
 	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
-		logger.Infoln("Error discarding response body: %v", err)
+		l.ErrorCtx(ctx, "compressedBody", zap.String("", fmt.Sprintf("Error discarding response body:%v", err)))
 	}
 
 	return nil
 }
 
-func compressedBody(body []byte, logger *zap.SugaredLogger) ([]byte, error) {
+func compressedBody(ctx context.Context, body []byte, l *logging.ZapLogger) ([]byte, error) {
 	var buf bytes.Buffer
 	zw := gzip.NewWriter(&buf)
 	_, err := zw.Write(body)
 	if err != nil {
-		logger.Fatal(err)
+		l.FatalCtx(ctx, "compressedBody", zap.String("", fmt.Sprintf("Error compressing request body:%v", err)))
 		return nil, err
 	}
 	err = zw.Close()
 	if err != nil {
-		logger.Fatal(err)
+		l.FatalCtx(ctx, "compressedBody", zap.String("", fmt.Sprintf("gzip close error:%v", err)))
 		return nil, err
 	}
 	compressedBody := buf.Bytes()
 	return compressedBody, err
 }
 
-func decompressReader(body io.ReadCloser, logger *zap.SugaredLogger) (*bytes.Buffer, error) {
+func decompressReader(ctx context.Context, body io.ReadCloser, l *logging.ZapLogger) (*bytes.Buffer, error) {
 	const maxDecompressedSize = 20 // 20 MB
 
 	gzReader, err := gzip.NewReader(body)
 	if err != nil {
-		logger.Fatalf("Error reading response body: %v", err)
+		l.FatalCtx(ctx, "decompressReader", zap.String("", fmt.Sprintf("Error reading response body:%v", err)))
 	}
 	defer gzReader.Close()
 
@@ -111,7 +112,7 @@ func decompressReader(body io.ReadCloser, logger *zap.SugaredLogger) (*bytes.Buf
 		if err == io.EOF {
 			err = fmt.Errorf("decompressed data exceeds maximum size limit")
 		}
-		logger.Fatalf("Error when copying: %v", err)
+		l.FatalCtx(ctx, "decompressReader", zap.String("", fmt.Sprintf("Error when copying:%v", err)))
 		return nil, err
 	}
 
