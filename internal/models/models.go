@@ -1,4 +1,4 @@
-package validation
+package models
 
 const (
 	TypeGauge   = "gauge"

@@ -1,11 +1,13 @@
 package app
 
 import (
+	"context"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/sanek1/metrics-collector/internal/controller"
-	v "github.com/sanek1/metrics-collector/internal/validation"
+	"github.com/sanek1/metrics-collector/pkg/logging"
 	"go.uber.org/zap"
 )
 
@@ -16,10 +18,17 @@ type App struct {
 	storeInterval int64
 	path          string
 	restore       bool
+	logger        *logging.ZapLogger
 }
 
 func New(addr string, storeInterval int64, path string, restore bool) *App {
-	ctrl := controller.New()
+	// init zap logger
+	logger, err := logging.NewZapLogger(zap.InfoLevel)
+	if err != nil {
+		panic(err)
+	}
+	l := startLogger()
+	ctrl := controller.New(l)
 
 	return &App{
 		controller: ctrl,
@@ -28,16 +37,27 @@ func New(addr string, storeInterval int64, path string, restore bool) *App {
 		storeInterval: storeInterval,
 		path:          path,
 		restore:       restore,
+		logger:        logger,
 	}
 }
 
-func (a *App) Run() error {
-	// init zap logger
-	loger, err := v.Initialize("info")
+func startLogger() *logging.ZapLogger {
+	ctx := context.Background()
+	l, err := logging.NewZapLogger(zap.InfoLevel)
+
 	if err != nil {
-		return err
+		log.Panic(err)
 	}
 
+	_ = l.WithContextFields(ctx,
+		zap.String("app", "logging"))
+
+	defer l.Sync()
+	return l
+}
+
+func (a *App) Run() error {
+	ctx := context.Background()
 	server := &http.Server{
 		Addr:              a.addr,
 		Handler:           a.controller.Router(),
@@ -46,7 +66,7 @@ func (a *App) Run() error {
 		IdleTimeout:       120 * time.Second,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	loger.Logger.Info("Running server ", zap.String("address", a.addr))
-	go a.controller.PeriodicallySaveBackUp(a.path, a.restore, time.Duration(a.storeInterval)*time.Second)
+	a.logger.InfoCtx(context.Background(), "Running server", zap.String("address%s", a.addr))
+	go a.controller.PeriodicallySaveBackUp(ctx, a.path, a.restore, time.Duration(a.storeInterval)*time.Second)
 	return server.ListenAndServe()
 }

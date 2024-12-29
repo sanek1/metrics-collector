@@ -4,12 +4,13 @@ import (
 	"log"
 
 	"github.com/sanek1/metrics-collector/internal/app"
+	"github.com/sanek1/metrics-collector/internal/flags"
 )
 
 func main() {
-	ParseFlags()
+	opt := flags.ParseServerFlags()
 
-	application := app.New(Options.flagRunAddr, Options.storeInterval, Options.path, Options.restore)
+	application := app.New(opt.FlagRunAddr, opt.StoreInterval, opt.Path, opt.Restore)
 	if err := application.Run(); err != nil {
 		log.Fatal(err)
 	}

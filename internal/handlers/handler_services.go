@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	con "context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,36 +11,42 @@ import (
 	"strings"
 
 	c "github.com/sanek1/metrics-collector/internal/config"
-	v "github.com/sanek1/metrics-collector/internal/validation"
+	m "github.com/sanek1/metrics-collector/internal/models"
+	"go.uber.org/zap"
 )
 
-func CounterService(rw http.ResponseWriter, model *v.Metrics, ms *MetricStorage) {
-	newmodel := ms.Storage.SetCounter(*model)
+func CounterService(ctx con.Context, rw http.ResponseWriter, model *m.Metrics, ms *MetricStorage) {
+	newmodel := ms.Storage.SetCounter(ctx, *model)
 	resp, err := json.Marshal(newmodel)
 	if err != nil {
+		ms.Logger.ErrorCtx(ctx, "The metric was not parsed", zap.Any("err", err.Error()))
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	SendResultStatusOK(rw, resp)
 }
 
-func GaugeService(rw http.ResponseWriter, model *v.Metrics, ms *MetricStorage) {
-	if ok := ms.Storage.SetGauge(*model); !ok {
+func GaugeService(ctx con.Context, rw http.ResponseWriter, model *m.Metrics, ms *MetricStorage) {
+	if ok := ms.Storage.SetGauge(ctx, *model); !ok {
+		ms.Logger.ErrorCtx(ctx, "The metric was not saved", zap.Any("err", "no such value exists"))
 		http.Error(rw, "No such value exists", http.StatusNotFound)
 		return
 	}
 	resp, err := json.Marshal(model)
 	if err != nil {
+		ms.Logger.ErrorCtx(ctx, "The metric was not marshaled", zap.Any("err", err.Error()))
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	SendResultStatusOK(rw, resp)
 }
 
-func ParseMetricServices(rw http.ResponseWriter, r *http.Request) (v.Metrics, error) {
-	var model v.Metrics
+func ParseMetricServices(rw http.ResponseWriter, r *http.Request) (m.Metrics, error) {
+	var model m.Metrics
 	if r.ContentLength == 0 {
 		if err := buildJSONBody(rw, r); err != nil {
+			err = fmt.Errorf("buildJSONBody")
+			fmt.Println("buildJSONBody")
 			return model, err
 		}
 	}
@@ -48,13 +55,16 @@ func ParseMetricServices(rw http.ResponseWriter, r *http.Request) (v.Metrics, er
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&model); err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
+		err = fmt.Errorf("buildJSONBody2: decoding")
+		fmt.Println("buildJSONBody2")
 		return model, err
 	}
 
-	if model.MType == v.TypeGauge || model.MType == v.TypeCounter {
+	if model.MType == m.TypeGauge || model.MType == m.TypeCounter {
 		return model, nil
 	} else {
 		rw.WriteHeader(http.StatusBadRequest)
+		fmt.Println("unsupported request type")
 		return model, fmt.Errorf("unsupported request type")
 	}
 }
@@ -91,11 +101,12 @@ func SendResultStatusNotOK(rw http.ResponseWriter, resp []byte) {
 func buildJSONBody(rw http.ResponseWriter, r *http.Request) (err error) {
 	key, name, val, err := readingDataFromURL(r)
 	if err != nil {
+		fmt.Println("url parsing")
 		http.Error(rw, "The value does not match the expected type.", http.StatusBadRequest)
 		return err
 	}
 	intVal := int64(*val)
-	model := v.Metrics{
+	model := m.Metrics{
 		ID:    name,
 		MType: key,
 		Delta: &intVal,
@@ -103,6 +114,7 @@ func buildJSONBody(rw http.ResponseWriter, r *http.Request) (err error) {
 	}
 	resp, err := json.Marshal(model)
 	if err != nil {
+		fmt.Println("marshaling error")
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return err
 	}

@@ -4,14 +4,17 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	m "github.com/sanek1/metrics-collector/internal/models"
 	"github.com/sanek1/metrics-collector/internal/storage"
-	v "github.com/sanek1/metrics-collector/internal/validation"
+	l "github.com/sanek1/metrics-collector/pkg/logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestGetMetricsByBody(t *testing.T) {
@@ -20,48 +23,42 @@ func TestGetMetricsByBody(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		model          v.Metrics
+		model          m.Metrics
 		expectedStatus int
 	}{
 		{
 			name: "counter",
-			model: v.Metrics{
+			model: m.Metrics{
 				ID:    "test1",
 				MType: "counter",
 				Delta: &value2,
 			},
-			expectedStatus: http.StatusOK, //test counter type
+			expectedStatus: http.StatusOK,
 		},
 		{
 			name: "gauge",
-			model: v.Metrics{
+			model: m.Metrics{
 				ID:    "test2",
 				MType: "gauge",
 				Value: &value1,
 			},
-			expectedStatus: http.StatusOK, //test gauge type
+			expectedStatus: http.StatusOK,
 		},
-		// {
-		// 	name: "unknown type",
-		// 	model: v.Metrics{
-		// 		ID:    "test3",
-		// 		MType: "unknown",
-		// 	},
-		// 	expectedStatus: http.StatusBadRequest, //test unknown type
-		// },
 	}
 
-	logger, err := v.Initialize("test_level")
-	if err != nil {
-		panic(err)
-	}
 	ctx := context.Background()
+	l, err := l.NewZapLogger(zap.InfoLevel)
+
+	if err != nil {
+		log.Panic(err)
+	}
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ms := MetricStorage{
 				Storage: &storage.MemoryStorage{
-					Metrics: make(map[string]v.Metrics),
-					Logger:  logger,
+					Metrics: make(map[string]m.Metrics),
+					Logger:  l,
 				},
 			}
 			b, _ := json.Marshal(test.model)
