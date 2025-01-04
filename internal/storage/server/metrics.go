@@ -17,23 +17,19 @@ const (
 	fileMode = 0600
 )
 
-// testcounter [ {"id": "counter1", "type": "counter", "delta": 1, "value": 123.4}]
-// testSetGet32 [ {"id": "testSetGet33", "type": "gauge", "delta": 1, "value": 123.4}
-type MemoryStorage struct {
+type MetricsStorage struct {
 	Metrics map[string]m.Metrics
 	Logger  *l.ZapLogger
 }
 
-// NewMemoryStorage returns a new MemoryStorage instance.
-// It creates an empty map of Metrics and a new Logger writing to os.Stdout.
-func NewMemoryStorage(logger *l.ZapLogger) *MemoryStorage {
-	return &MemoryStorage{
+func NewMetricsStorage(logger *l.ZapLogger) *MetricsStorage {
+	return &MetricsStorage{
 		Metrics: make(map[string]m.Metrics),
 		Logger:  logger,
 	}
 }
 
-func (ms *MemoryStorage) GetAllMetrics() []string {
+func (ms *MetricsStorage) GetAllMetrics() []string {
 	result := make([]string, 0, len(ms.Metrics))
 	for id, metric := range ms.Metrics {
 		var value string
@@ -53,7 +49,7 @@ func (ms *MemoryStorage) GetAllMetrics() []string {
 	return result
 }
 
-func (ms *MemoryStorage) GetMetrics(key, metricName string) (*m.Metrics, bool) {
+func (ms *MetricsStorage) GetMetrics(key, metricName string) (*m.Metrics, bool) {
 	metric, ok := ms.Metrics[metricName]
 	if !ok {
 		return nil, false
@@ -61,7 +57,7 @@ func (ms *MemoryStorage) GetMetrics(key, metricName string) (*m.Metrics, bool) {
 	return &metric, true
 }
 
-func (ms *MemoryStorage) SetCounter(ctx context.Context, model m.Metrics) m.Metrics {
+func (ms *MetricsStorage) SetCounter(ctx context.Context, model m.Metrics) m.Metrics {
 	setLog(ctx, ms, &model, "SetCounter")
 	if metric, ok := ms.Metrics[model.ID]; ok {
 		*metric.Delta += *model.Delta
@@ -76,17 +72,17 @@ func (ms *MemoryStorage) SetCounter(ctx context.Context, model m.Metrics) m.Metr
 	return ms.Metrics[model.ID]
 }
 
-func (ms *MemoryStorage) SetGauge(ctx context.Context, model m.Metrics) bool {
+func (ms *MetricsStorage) SetGauge(ctx context.Context, model m.Metrics) bool {
 	setLog(ctx, ms, &model, "SetGauge")
 	ms.Metrics[model.ID] = m.Metrics{ID: model.ID, MType: model.MType, Value: model.Value}
 	return true
 }
 
-func setLog(ctx context.Context, ms *MemoryStorage, model *m.Metrics, name string) {
+func setLog(ctx context.Context, ms *MetricsStorage, model *m.Metrics, name string) {
 	ms.Logger.InfoCtx(ctx, name, zap.String(name, fmt.Sprintf("model%s", formatMetric(*model))))
 }
 
-func (ms *MemoryStorage) SaveToFile(fname string) error {
+func (ms *MetricsStorage) SaveToFile(fname string) error {
 	// serialize to json
 	data, err := json.MarshalIndent(ms.Metrics, "", "   ")
 	if err != nil {
@@ -101,7 +97,7 @@ func (ms *MemoryStorage) SaveToFile(fname string) error {
 	return nil
 }
 
-func (ms *MemoryStorage) LoadFromFile(filename string) error {
+func (ms *MetricsStorage) LoadFromFile(filename string) error {
 	content, err := os.ReadFile(filename)
 	if err != nil {
 		if os.IsNotExist(err) {

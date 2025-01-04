@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	m "github.com/sanek1/metrics-collector/internal/models"
-	"github.com/sanek1/metrics-collector/internal/storage"
+	storage "github.com/sanek1/metrics-collector/internal/storage/server"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -55,8 +55,8 @@ func TestGetMetricsByBody(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ms := MetricStorage{
-				Storage: &storage.MemoryStorage{
+			s := Storage{
+				Storage: &storage.MetricsStorage{
 					Metrics: make(map[string]m.Metrics),
 					Logger:  l,
 				},
@@ -65,7 +65,7 @@ func TestGetMetricsByBody(t *testing.T) {
 			req, err := http.NewRequestWithContext(ctx, "POST", "/", bytes.NewBuffer(b))
 			require.NoError(t, err)
 			w := httptest.NewRecorder()
-			ms.GetMetricsHandler(w, req)
+			s.GetMetricsHandler(w, req)
 
 			assert.Equal(t, test.expectedStatus, w.Code)
 		})

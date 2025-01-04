@@ -7,23 +7,22 @@ import (
 
 	"github.com/sanek1/metrics-collector/internal/handlers"
 	"github.com/sanek1/metrics-collector/internal/routing"
-	"github.com/sanek1/metrics-collector/internal/storage"
+	storage "github.com/sanek1/metrics-collector/internal/storage/server"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
 	"go.uber.org/zap"
 )
 
 type Controller struct {
-	metricStorage handlers.MetricStorage
+	metricStorage handlers.Storage
 	router        http.Handler
 }
 
 func New(logger *l.ZapLogger) *Controller {
-	storageImpl := storage.NewMemoryStorage(logger)
-	metricStorage := handlers.MetricStorage{
-		Storage: storageImpl,
-		Logger:  storageImpl.Logger,
+	metricStorage := handlers.Storage{
+		Storage: storage.NewMetricsStorage(logger),
+		Logger:  logger,
 	}
-	r := routing.New(storageImpl.Logger)
+	r := routing.New(logger)
 
 	return &Controller{
 		metricStorage: metricStorage,

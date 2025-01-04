@@ -1,0 +1,28 @@
+package controller
+
+import (
+	"context"
+	"net/http"
+	"testing"
+
+	flags "github.com/sanek1/metrics-collector/internal/flags/agent"
+	l "github.com/sanek1/metrics-collector/pkg/logging"
+	"go.uber.org/zap"
+)
+
+func TestSendingGaugeMetrics(t *testing.T) {
+	ctx := context.Background()
+	l, _ := l.NewZapLogger(zap.InfoLevel)
+
+	client := &http.Client{}
+	opt := &flags.Options{FlagRunAddr: ":8080"}
+
+	ctrl := New(opt, l)
+
+	metrics := map[string]float64{
+		"gauge1": 10.56,
+		"gauge2": 20.75,
+	}
+
+	ctrl.SendingGaugeMetrics(ctx, metrics, client)
+}

@@ -16,8 +16,8 @@ const (
 	fileMode = 0600
 )
 
-func (ms MetricStorage) MainPageHandler(rw http.ResponseWriter, r *http.Request) {
-	metrics := ms.Storage.GetAllMetrics()
+func (s Storage) MainPageHandler(rw http.ResponseWriter, r *http.Request) {
+	metrics := s.Storage.GetAllMetrics()
 	htmlData := GenerateHTMLServices(metrics)
 	rw.Header().Set("Content-Type", "text/html")
 	rw.WriteHeader(http.StatusOK)
@@ -27,13 +27,13 @@ func (ms MetricStorage) MainPageHandler(rw http.ResponseWriter, r *http.Request)
 	}
 }
 
-func (ms MetricStorage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.Request) {
+func (s Storage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.Request) {
 	typeMetric := chi.URLParam(r, "type")
 	nameMetric := chi.URLParam(r, "*")
-	ms.Logger.InfoCtx(r.Context(),
+	s.Logger.InfoCtx(r.Context(),
 		fmt.Sprintf("handler GetMetricsByNameHandler. GetMetricsByNameHandler typeMetric %s nameMetric %s", typeMetric, nameMetric))
 
-	if m, ok := ms.Storage.GetMetrics(typeMetric, nameMetric); ok {
+	if m, ok := s.Storage.GetMetrics(typeMetric, nameMetric); ok {
 		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		answer := ""
 		if m.MType == "counter" {
@@ -50,14 +50,14 @@ func (ms MetricStorage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.
 	http.Error(rw, "No such value exists", http.StatusNotFound)
 }
 
-func (ms MetricStorage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http.Request) {
+func (s Storage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 	model, err := ParseMetricServices(rw, r)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if m, ok := ms.Storage.GetMetrics(model.MType, model.ID); ok {
+	if m, ok := s.Storage.GetMetrics(model.MType, model.ID); ok {
 		resp, err := json.Marshal(m)
 		if err != nil {
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -69,31 +69,34 @@ func (ms MetricStorage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http
 	http.Error(rw, "No such value exists", http.StatusNotFound)
 }
 
-func (ms MetricStorage) GetMetricsHandler(rw http.ResponseWriter, r *http.Request) {
+func (s Storage) GetMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 
 	model, err := ParseMetricServices(rw, r)
-	ctx = ms.Logger.WithContextFields(ctx,
+	ctx = s.Logger.WithContextFields(ctx,
 		zap.String("type", model.MType))
 	if err != nil {
-		ms.Logger.ErrorCtx(ctx, "The metric was not parsed", zap.Any("err", err.Error()))
+		s.Logger.ErrorCtx(ctx, "The metric was not parsed", zap.Any("err", err.Error()))
 		SendResultStatusNotOK(rw, []byte(`{"error": "failed to read body"}`))
 		return
 	}
+
+	services := NewHandlerServices(&s, &model)
+
 	switch model.MType {
 	case "counter":
-		CounterService(ctx, rw, &model, &ms)
+		services.CounterService(ctx, rw)
 	case "gauge":
-		GaugeService(ctx, rw, &model, &ms)
+		services.GaugeService(ctx, rw)
 	default:
 		http.Error(rw, "No such value exists", http.StatusNotFound)
 		return
 	}
 }
 
-func (ms MetricStorage) SaveToFile(fname string) error {
+func (s Storage) SaveToFile(fname string) error {
 	// serialize to json
-	data, err := json.MarshalIndent(ms.Storage, "", "   ")
+	data, err := json.MarshalIndent(s.Storage, "", "   ")
 	if err != nil {
 		return err
 	}

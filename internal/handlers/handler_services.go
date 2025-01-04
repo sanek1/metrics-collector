@@ -15,26 +15,38 @@ import (
 	"go.uber.org/zap"
 )
 
-func CounterService(ctx con.Context, rw http.ResponseWriter, model *m.Metrics, ms *MetricStorage) {
-	newmodel := ms.Storage.SetCounter(ctx, *model)
-	resp, err := json.Marshal(newmodel)
+type Services struct {
+	s     *Storage
+	model *m.Metrics
+}
+
+func NewHandlerServices(storage *Storage, model *m.Metrics) *Services {
+	return &Services{
+		s:     storage,
+		model: model,
+	}
+}
+
+func (s *Services) CounterService(ctx con.Context, rw http.ResponseWriter) {
+	model := s.s.Storage.SetCounter(ctx, *s.model)
+	resp, err := json.Marshal(model)
 	if err != nil {
-		ms.Logger.ErrorCtx(ctx, "The metric was not parsed", zap.Any("err", err.Error()))
+		s.s.Logger.ErrorCtx(ctx, "The metric was not parsed", zap.Any("err", err.Error()))
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	SendResultStatusOK(rw, resp)
 }
 
-func GaugeService(ctx con.Context, rw http.ResponseWriter, model *m.Metrics, ms *MetricStorage) {
-	if ok := ms.Storage.SetGauge(ctx, *model); !ok {
-		ms.Logger.ErrorCtx(ctx, "The metric was not saved", zap.Any("err", "no such value exists"))
+func (s *Services) GaugeService(ctx con.Context, rw http.ResponseWriter) {
+	if ok := s.s.Storage.SetGauge(ctx, *s.model); !ok {
+		s.s.Logger.ErrorCtx(ctx, "The metric was not saved", zap.Any("err", "no such value exists"))
 		http.Error(rw, "No such value exists", http.StatusNotFound)
 		return
 	}
-	resp, err := json.Marshal(model)
+	resp, err := json.Marshal(s.model)
 	if err != nil {
-		ms.Logger.ErrorCtx(ctx, "The metric was not marshaled", zap.Any("err", err.Error()))
+		s.s.Logger.ErrorCtx(ctx, "The metric was not marshaled", zap.Any("err", err.Error()))
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}

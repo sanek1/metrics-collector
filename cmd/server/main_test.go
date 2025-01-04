@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	h "github.com/sanek1/metrics-collector/internal/handlers"
-	s "github.com/sanek1/metrics-collector/internal/storage"
+	s "github.com/sanek1/metrics-collector/internal/storage/server"
 	v "github.com/sanek1/metrics-collector/internal/validation"
 	"github.com/sanek1/metrics-collector/pkg/logging"
 	"github.com/stretchr/testify/require"
@@ -30,8 +30,8 @@ func TestRouter(t *testing.T) {
 	if err != nil {
 		log.Panic(err)
 	}
-	memStorage := s.NewMemoryStorage(l)
-	metricStorage := h.MetricStorage{
+	memStorage := s.NewMetricsStorage(l)
+	metricStorage := h.Storage{
 		Storage: memStorage,
 		Logger:  memStorage.Logger,
 	}
@@ -83,8 +83,8 @@ func TestGzipCompression(t *testing.T) {
 		log.Panic(err)
 	}
 
-	storageImpl := s.NewMemoryStorage(l)
-	metricStorage := h.MetricStorage{
+	storageImpl := s.NewMetricsStorage(l)
+	metricStorage := h.Storage{
 		Storage: storageImpl,
 		Logger:  storageImpl.Logger,
 	}

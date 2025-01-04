@@ -6,13 +6,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sanek1/metrics-collector/internal/controller"
+	c "github.com/sanek1/metrics-collector/internal/controller/server"
 	"github.com/sanek1/metrics-collector/pkg/logging"
 	"go.uber.org/zap"
 )
 
 type App struct {
-	controller *controller.Controller
+	controller *c.Controller
 	addr       string
 
 	storeInterval int64
@@ -28,7 +28,7 @@ func New(addr string, storeInterval int64, path string, restore bool) *App {
 		panic(err)
 	}
 	l := startLogger()
-	ctrl := controller.New(l)
+	ctrl := c.New(l)
 
 	return &App{
 		controller: ctrl,

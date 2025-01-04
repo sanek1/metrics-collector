@@ -59,3 +59,31 @@ tasks:
       cmds:
         - golangci-lint run --config .golangci.yml
       silent: true
+  clear:
+      cmds:
+        - mkdir -p ./.runtime
+        - rm -f ./.runtime/{agent,server,BACKUP,test.log}
+        - rm -f logs/{test1.log,test2.log,test3.log,test4.log,test5.log6,test.log7,test.log8,test9.log}
+      silent: true
+  build:
+      deps: [lint, clear]
+      cmds:
+        - go build -o ./.runtime/agent ./cmd/agent/*.go
+        - go build -o ./.runtime/server ./cmd/server/*.go
+      silent: true
+  test:
+      deps: [build]
+      cmds:
+        - go test -cover ./... > logs/cover.log
+        - metricstest -test.v -test.run=^TestIteration1$ -binary-path=cmd/server/server >> logs/test1.log
+        - metricstest -test.v -test.run=^TestIteration2[AB]*$ -source-path=. -agent-binary-path=cmd/agent/agent >> logs/test2.log
+        - metricstest -test.v -test.run=^TestIteration3[AB]*$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server >> logs/test3.log
+        - metricstest -test.v -test.run=^TestIteration4$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080 >> logs/test4.log
+        - metricstest -test.v -test.run=^TestIteration5$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080 >> logs/test5.log
+        - metricstest -test.v -test.run=^TestIteration6$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080 >> logs/test6.log
+        - metricstest -test.v -test.run=^TestIteration7$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080 >> logs/test7.log
+        - metricstest -test.v -test.run=^TestIteration8$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080 >> logs/test8.log
+        - metricstest -test.v -test.run=^TestIteration9$ -file-storage-path=./BACKUP -source-path=\. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080 >> logs/test9.log
+        - mv ./BACKUP ./.runtime/
+
+

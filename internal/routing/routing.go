@@ -23,7 +23,7 @@ func New(logger *l.ZapLogger) *Controller {
 	}
 }
 
-func (c *Controller) InitRouting(ms h.MetricStorage) http.Handler {
+func (c *Controller) InitRouting(ms h.Storage) http.Handler {
 	r := chi.NewRouter()
 	r.Use(c.midleware.Recover, v.GzipMiddleware)
 
