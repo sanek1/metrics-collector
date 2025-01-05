@@ -17,9 +17,16 @@ cmd/agent/agent
 cmd/server/main
 cmd/server/server
 
+# Storage file
+cmd/server/serverFile_Log_Store
+
 # Dependency directories (remove the comment below to include it)
 vendor/
 
 # IDEs directories
 .idea
 .vscode
+/cmd/server/File_Log_Store.json
+/internal/controller/File_Log_Store.json
+/logs
+/.runtime

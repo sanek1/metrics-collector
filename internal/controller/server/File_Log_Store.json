@@ -1,0 +1,7 @@
+{
+   "test_gauge": {
+      "id": "test_gauge",
+      "type": "gauge",
+      "value": 11
+   }
+}

@@ -1,67 +1,147 @@
 package main
 
 import (
-	"encoding/json"
+	"bytes"
+	"compress/gzip"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	h "github.com/sanek1/metrics-collector/internal/handlers"
-	rc "github.com/sanek1/metrics-collector/internal/routing"
-	s "github.com/sanek1/metrics-collector/internal/storage"
-	"github.com/stretchr/testify/assert"
+	s "github.com/sanek1/metrics-collector/internal/storage/server"
+	v "github.com/sanek1/metrics-collector/internal/validation"
+	"github.com/sanek1/metrics-collector/pkg/logging"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
-func testRequest(t *testing.T, ts *httptest.Server, method,
-	path string) (*http.Response, string) {
-	req, err := http.NewRequest(method, ts.URL+path, nil)
-	require.NoError(t, err)
-
-	resp, err := ts.Client().Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	return resp, string(respBody)
+type testTable struct {
+	url    string
+	body   string
+	want   string
+	status int
 }
 
 func TestRouter(t *testing.T) {
+	l, err := logging.NewZapLogger(zap.InfoLevel)
 
-	memStorage := s.NewMemoryStorage()
-	metricStorage := h.MetricStorage{
+	if err != nil {
+		log.Panic(err)
+	}
+	memStorage := s.NewMetricsStorage(l)
+	metricStorage := h.Storage{
 		Storage: memStorage,
+		Logger:  memStorage.Logger,
 	}
 
-	ts := httptest.NewServer(rc.InitRouting(metricStorage))
-	defer ts.Close()
-	var testTable = []struct {
-		url    string
-		want   string
-		status int
-	}{
-		{"/update/counter/Mallocs/777", `{"value":"Metric Name: Mallocs, Metric Value:777"}`, http.StatusOK},
-		{"/update/gauge/Alloc/777", `{"value":"Metric Name: Alloc, Metric Value:777"}`, http.StatusOK},
-		//bad response
-		{"/update/unknown/Mallocs/7", "Bad Request Handler\n", http.StatusBadRequest},
-		{"/update1/counter/Mallocs/7", "Not Implemented\n", http.StatusBadRequest},
-		{"/update/gauge/Alloc/77.7.", "The value does not match the expected type.\n", http.StatusBadRequest},
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		v.GzipMiddleware(http.HandlerFunc(metricStorage.GetMetricsHandler)).ServeHTTP(w, r)
+	})
+
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	var testTable = []testTable{
+		{"/update/counter/Mallocs/777", `{"id": "test_Mallocs", "type": "counter", "delta": 5, "value": 123.4}`, `{"id":"test_Mallocs","type":"counter","delta":5}`, http.StatusOK},
+		{"/update/counter/Mallocs/777", `{"id": "test_Mallocs", "type": "counter", "delta": 6, "value": 123.4}`, `{"id":"test_Mallocs","type":"counter","delta":11}`, http.StatusOK}, // expected 5+5=10
+		{"/update/gauge/Alloc/777", `{"id": "test_Alloc", "type": "gauge", "delta": 6, "value": 123.4}`, `{"id":"test_Alloc","type":"gauge","delta":6,"value":123.4}`, http.StatusOK},
 	}
 	for _, v := range testTable {
-		resp, post := testRequest(t, ts, "POST", v.url)
-		defer resp.Body.Close()
-		assert.Equal(t, v.status, resp.StatusCode)
-		if isValidJSON(v.want) {
-			assert.JSONEq(t, v.want, post)
-		} else {
-			assert.Equal(t, v.want, post)
-		}
+		t.Run("sends_gzip", func(t *testing.T) {
+			buf := bytes.NewBuffer(nil)
+			zb := gzip.NewWriter(buf)
+			_, err := zb.Write([]byte(v.body))
+			require.NoError(t, err)
+			err = zb.Close()
+			require.NoError(t, err)
+
+			r := httptest.NewRequest("POST", srv.URL, buf)
+			r.RequestURI = ""
+			r.Header.Set("Content-Encoding", "gzip")
+			r.Header.Set("Accept-Encoding", "")
+
+			resp, err := http.DefaultClient.Do(r)
+			require.NoError(t, err)
+			require.Equal(t, v.status, resp.StatusCode)
+
+			defer resp.Body.Close()
+
+			b, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			str := string(b)
+			require.JSONEq(t, v.want, str)
+		})
 	}
 }
 
-func isValidJSON(s string) bool {
-	var js interface{}
-	return json.Unmarshal([]byte(s), &js) == nil
+func TestGzipCompression(t *testing.T) {
+	l, err := logging.NewZapLogger(zap.InfoLevel)
+
+	if err != nil {
+		log.Panic(err)
+	}
+
+	storageImpl := s.NewMetricsStorage(l)
+	metricStorage := h.Storage{
+		Storage: storageImpl,
+		Logger:  storageImpl.Logger,
+	}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		v.GzipMiddleware(http.HandlerFunc(metricStorage.GetMetricsHandler)).ServeHTTP(w, r)
+	})
+
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	requestBody := `{"id": "testSetGet33", "type": "gauge", "delta": 1, "value": 123.4}`
+	successBody := `{"id":"testSetGet33","type":"gauge","delta":1,"value":123.4}`
+
+	t.Run("sends_gzip", func(t *testing.T) {
+		buf := bytes.NewBuffer(nil)
+		zb := gzip.NewWriter(buf)
+		_, err := zb.Write([]byte(requestBody))
+		require.NoError(t, err)
+		err = zb.Close()
+		require.NoError(t, err)
+
+		r := httptest.NewRequest("POST", srv.URL, buf)
+		r.RequestURI = ""
+		r.Header.Set("Content-Encoding", "gzip")
+		r.Header.Set("Accept-Encoding", "")
+
+		resp, err := http.DefaultClient.Do(r)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		defer resp.Body.Close()
+
+		b, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		str := string(b)
+		require.JSONEq(t, successBody, str)
+	})
+
+	t.Run("accepts_gzip", func(t *testing.T) {
+		buf := bytes.NewBufferString(requestBody)
+		r := httptest.NewRequest("POST", srv.URL, buf)
+		r.RequestURI = ""
+		r.Header.Set("Accept-Encoding", "gzip")
+
+		resp, err := http.DefaultClient.Do(r)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		defer resp.Body.Close()
+
+		zr, err := gzip.NewReader(resp.Body)
+		require.NoError(t, err)
+
+		b, err := io.ReadAll(zr)
+		require.NoError(t, err)
+
+		require.JSONEq(t, successBody, string(b))
+	})
 }

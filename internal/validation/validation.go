@@ -1,36 +1,55 @@
 package validation
 
 import (
-	"log"
 	"net/http"
 	"strings"
 
-	c "github.com/sanek1/metrics-collector/internal/config"
+	"github.com/sanek1/metrics-collector/internal/config"
+	l "github.com/sanek1/metrics-collector/pkg/logging"
+	"go.uber.org/zap"
 )
 
-var logger *log.Logger
+type Middleware func(http.Handler) http.Handler
 
-func init() {
-	logger = log.New(log.Writer(), "VALIDATION: ", log.Ldate|log.Ltime|log.Lshortfile)
+type MiddlewareController struct {
+	l *l.ZapLogger
 }
 
-func Validation(next http.Handler) func(http.ResponseWriter, *http.Request) {
-	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		logValidationMessage("-- start validation --")
-		rw.Header().Set("Content-Type", "application/json")
-		splitedPath := strings.Split(r.URL.Path, "/")
-		if len(splitedPath) < c.MinPathLen {
-			message := "invalid path"
+func New(logger *l.ZapLogger) *MiddlewareController {
+	return &MiddlewareController{
+		l: logger,
+	}
+}
 
-			logValidationMessage(message)
-			http.Error(rw, message, http.StatusNotFound)
-			return
-		}
-		next.ServeHTTP(rw, r)
-		logValidationMessage("--validation completed successfully--")
+func Conveyor(h http.Handler, middlewares ...Middleware) http.Handler {
+	for _, middleware := range middlewares {
+		h = middleware(h)
+	}
+	return h
+}
+func (c *MiddlewareController) Recover(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				c.l.PanicCtx(r.Context(), "recovered from panic", zap.Any("panic", rec))
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			}
+		}()
+
+		next.ServeHTTP(w, r)
 	})
 }
 
-func logValidationMessage(message string) {
-	logger.Println(message)
+func (c *MiddlewareController) ValidationOld(next http.Handler) func(http.ResponseWriter, *http.Request) {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rw.Header().Set("Content-Type", "application/json")
+		splitedPath := strings.Split(r.URL.Path, "/")
+		if len(splitedPath) < config.MinPathLen {
+			message := "invalid path"
+			c.l.ErrorCtx(r.Context(), message, zap.Any("invalid path", r.URL.Path))
+			http.Error(rw, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			return
+		}
+		next.ServeHTTP(rw, r)
+	})
 }

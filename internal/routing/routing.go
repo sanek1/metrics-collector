@@ -4,25 +4,43 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
 	h "github.com/sanek1/metrics-collector/internal/handlers"
 	v "github.com/sanek1/metrics-collector/internal/validation"
+	l "github.com/sanek1/metrics-collector/pkg/logging"
 )
 
-func InitRouting(ms h.MetricStorage) http.Handler {
+type Controller struct {
+	r         chi.Router
+	l         *l.ZapLogger
+	midleware *v.MiddlewareController
+}
+
+func New(logger *l.ZapLogger) *Controller {
+	return &Controller{
+		l:         logger,
+		r:         chi.NewRouter(),
+		midleware: v.New(logger),
+	}
+}
+
+func (c *Controller) InitRouting(ms h.Storage) http.Handler {
 	r := chi.NewRouter()
-	r.Use(middleware.Logger)
+	r.Use(c.midleware.Recover, v.GzipMiddleware)
 
-	// get
-	r.Get("/*", http.HandlerFunc(ms.MainPageHandler))
-	r.Get("/{value}/{type}/*", http.HandlerFunc(ms.GetMetricsByNameHandler))
+	r.Route("/", func(r chi.Router) {
+		// Get routes
+		r.Get("/*", http.HandlerFunc(ms.MainPageHandler))
+		r.Get("/{value}/{type}/*", http.HandlerFunc(ms.GetMetricsByNameHandler))
 
-	// post
-	r.Post("/*", v.Validation(http.HandlerFunc(h.NotImplementedHandler)))
-	r.Route("/update", func(r chi.Router) {
-		r.Post("/*", v.Validation(http.HandlerFunc(h.BadRequestHandler)))
-		r.Post("/gauge/*", v.Validation(http.HandlerFunc(ms.GaugeHandler)))
-		r.Post("/counter/*", v.Validation(http.HandlerFunc(ms.CounterHandler)))
+		// Post routes
+		r.Post("/*", c.midleware.ValidationOld(http.HandlerFunc(h.NotImplementedHandler)))
+		r.Post("/value/*", http.HandlerFunc(ms.GetMetricsByValueHandler))
+
+		r.Route("/update", func(r chi.Router) {
+			r.Post("/*", http.HandlerFunc(ms.GetMetricsHandler))
+			r.Post("/gauge/*", c.midleware.ValidationOld(http.HandlerFunc(ms.GetMetricsHandler)))
+			r.Post("/counter/*", c.midleware.ValidationOld(http.HandlerFunc(ms.GetMetricsHandler)))
+		})
 	})
 
 	return r
