@@ -9,12 +9,23 @@ import (
 	"os"
 
 	"github.com/go-chi/chi"
+	storage "github.com/sanek1/metrics-collector/internal/storage/server"
+	l "github.com/sanek1/metrics-collector/pkg/logging"
 	"go.uber.org/zap"
 )
 
 const (
 	fileMode = 0600
 )
+
+type Storage struct {
+	Storage storage.Storage
+	Logger  *l.ZapLogger
+}
+
+func NewStorage(s storage.Storage, zl *l.ZapLogger) *Storage {
+	return &Storage{Storage: s, Logger: zl}
+}
 
 func (s Storage) MainPageHandler(rw http.ResponseWriter, r *http.Request) {
 	metrics := s.Storage.GetAllMetrics()
@@ -81,7 +92,7 @@ func (s Storage) GetMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	services := NewHandlerServices(&s, &model)
+	services := NewHandlerServices(s.Storage, &model, s.Logger)
 
 	switch model.MType {
 	case "counter":

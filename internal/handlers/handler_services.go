@@ -12,26 +12,30 @@ import (
 
 	c "github.com/sanek1/metrics-collector/internal/config"
 	m "github.com/sanek1/metrics-collector/internal/models"
+	storage "github.com/sanek1/metrics-collector/internal/storage/server"
+	l "github.com/sanek1/metrics-collector/pkg/logging"
 	"go.uber.org/zap"
 )
 
 type Services struct {
-	s     *Storage
-	model *m.Metrics
+	s      storage.Storage
+	model  *m.Metrics
+	logger *l.ZapLogger
 }
 
-func NewHandlerServices(storage *Storage, model *m.Metrics) *Services {
+func NewHandlerServices(st storage.Storage, model *m.Metrics, zl *l.ZapLogger) *Services {
 	return &Services{
-		s:     storage,
-		model: model,
+		s:      st,
+		model:  model,
+		logger: zl,
 	}
 }
 
 func (s *Services) CounterService(ctx con.Context, rw http.ResponseWriter) {
-	model := s.s.Storage.SetCounter(ctx, *s.model)
+	model := s.s.SetCounter(ctx, *s.model)
 	resp, err := json.Marshal(model)
 	if err != nil {
-		s.s.Logger.ErrorCtx(ctx, "The metric was not parsed", zap.Any("err", err.Error()))
+		s.logger.ErrorCtx(ctx, "The metric was not parsed", zap.Any("err", err.Error()))
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -39,14 +43,14 @@ func (s *Services) CounterService(ctx con.Context, rw http.ResponseWriter) {
 }
 
 func (s *Services) GaugeService(ctx con.Context, rw http.ResponseWriter) {
-	if ok := s.s.Storage.SetGauge(ctx, *s.model); !ok {
-		s.s.Logger.ErrorCtx(ctx, "The metric was not saved", zap.Any("err", "no such value exists"))
+	if ok := s.s.SetGauge(ctx, *s.model); !ok {
+		s.logger.ErrorCtx(ctx, "The metric was not saved", zap.Any("err", "no such value exists"))
 		http.Error(rw, "No such value exists", http.StatusNotFound)
 		return
 	}
 	resp, err := json.Marshal(s.model)
 	if err != nil {
-		s.s.Logger.ErrorCtx(ctx, "The metric was not marshaled", zap.Any("err", err.Error()))
+		s.logger.ErrorCtx(ctx, "The metric was not marshaled", zap.Any("err", err.Error()))
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	m "github.com/sanek1/metrics-collector/internal/models"
+	storage "github.com/sanek1/metrics-collector/internal/storage/server"
 	"github.com/sanek1/metrics-collector/pkg/logging"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
@@ -39,7 +40,7 @@ func TestController_PeriodicallySaveBackUp(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	ctrl := New(logger)
+	ctrl := New(storage.NewMetricsStorage(logger), logger)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -49,7 +50,7 @@ func TestController_PeriodicallySaveBackUp(t *testing.T) {
 			// send metrics to server
 			var v = 11.0
 			metric := m.NewMetricGauge("test_gauge", &v)
-			ok := ctrl.metricStorage.Storage.SetGauge(ctx, *metric)
+			ok := ctrl.storage.SetGauge(ctx, *metric)
 			if !ok {
 				t.Error("Failed to set gauge in memory storage")
 			}
@@ -60,7 +61,7 @@ func TestController_PeriodicallySaveBackUp(t *testing.T) {
 			//file save successful
 			time.Sleep(15 * time.Second)
 			// check file exists
-			if err := ctrl.metricStorage.Storage.LoadFromFile(tt.args.filename); err != nil {
+			if err := ctrl.storage.LoadFromFile(tt.args.filename); err != nil {
 				t.Errorf("Error loading metrics from file: %v", err)
 			}
 

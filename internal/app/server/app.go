@@ -7,6 +7,7 @@ import (
 	"time"
 
 	c "github.com/sanek1/metrics-collector/internal/controller/server"
+	storage "github.com/sanek1/metrics-collector/internal/storage/server"
 	"github.com/sanek1/metrics-collector/pkg/logging"
 	"go.uber.org/zap"
 )
@@ -19,6 +20,8 @@ type App struct {
 	path          string
 	restore       bool
 	logger        *logging.ZapLogger
+
+	store storage.Storage
 }
 
 func New(addr string, storeInterval int64, path string, restore bool) *App {
@@ -28,7 +31,11 @@ func New(addr string, storeInterval int64, path string, restore bool) *App {
 		panic(err)
 	}
 	l := startLogger()
-	ctrl := c.New(l)
+
+	// init storage
+	s := storage.NewMetricsStorage(l)
+
+	ctrl := c.New(s, l)
 
 	return &App{
 		controller: ctrl,
@@ -38,6 +45,8 @@ func New(addr string, storeInterval int64, path string, restore bool) *App {
 		path:          path,
 		restore:       restore,
 		logger:        logger,
+
+		store: s,
 	}
 }
 
