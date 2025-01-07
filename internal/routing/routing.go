@@ -21,12 +21,13 @@ type Controller struct {
 
 func New(s storage.Storage, db *sql.DB, logger *l.ZapLogger) *Controller {
 	c := &Controller{
-		l:         logger,
-		r:         chi.NewRouter(),
-		midleware: v.New(logger),
-		storage:   s,
+		l:       logger,
+		r:       chi.NewRouter(),
+		storage: s,
 	}
+
 	c.s = h.NewStorage(s, db, logger)
+	c.midleware = v.New(c.s, logger)
 	return c
 }
 
@@ -36,8 +37,8 @@ func (c *Controller) InitRouting() http.Handler {
 
 	r.Route("/", func(r chi.Router) {
 		// Get routes
-		r.Get("/*", http.HandlerFunc(c.s.MainPageHandler))
-		r.Get("/ping/*", http.HandlerFunc(c.s.PingDBHandler))
+		r.Get("/*", c.midleware.CheckForPingMiddleware(http.HandlerFunc(c.s.MainPageHandler)))
+		r.Get("/ping/", http.HandlerFunc(c.s.PingDBHandler))
 		r.Get("/{value}/{type}/*", http.HandlerFunc(c.s.GetMetricsByNameHandler))
 
 		// Post routes

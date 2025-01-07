@@ -35,6 +35,7 @@ func New(opt *flags.ServerOptions) *App {
 	// init db connection
 	db, err := startDB(opt)
 	if err != nil {
+		logger.InfoCtx(context.Background(), opt.DBPath, zap.Error(err))
 		logger.ErrorCtx(context.Background(), "Error connecting to database", zap.Error(err))
 	}
 	// init storage
@@ -58,7 +59,6 @@ func startDB(opt *flags.ServerOptions) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	err = db.Ping()
 	if err != nil {
 		return nil, err
@@ -67,8 +67,7 @@ func startDB(opt *flags.ServerOptions) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	//defer db.Close()
-
+	// defer db.Close()
 	return db, nil
 }
 

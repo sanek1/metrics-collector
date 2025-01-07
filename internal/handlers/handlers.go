@@ -83,6 +83,7 @@ func (s Storage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http.Reques
 }
 
 func (s Storage) PingDBHandler(rw http.ResponseWriter, r *http.Request) {
+	s.Logger.InfoCtx(r.Context(), "handler PingDBHandler")
 	rw.Header().Set("Content-Type", "application/json")
 	// ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	// defer cancel()

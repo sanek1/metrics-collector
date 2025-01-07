@@ -35,6 +35,7 @@ func NewHandlerServices(st storage.Storage, db *sql.DB, model *m.Metrics, zl *l.
 }
 
 func (s *Services) PingService(ctx con.Context, rw http.ResponseWriter) {
+	s.logger.InfoCtx(ctx, "PingService start")
 	if s.db == nil {
 		s.logger.ErrorCtx(ctx, "Database is nil")
 		SendResultStatusNotOK(rw, nil)

@@ -28,6 +28,7 @@ func New(s storage.Storage, db *sql.DB, logger *l.ZapLogger) *Controller {
 }
 
 func (c *Controller) Router() http.Handler {
+	c.logger.InfoCtx(context.Background(), "init router")
 	return c.router
 }
 
