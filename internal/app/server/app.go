@@ -2,52 +2,74 @@ package app
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"net/http"
 	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	c "github.com/sanek1/metrics-collector/internal/controller/server"
+	flags "github.com/sanek1/metrics-collector/internal/flags/server"
 	storage "github.com/sanek1/metrics-collector/internal/storage/server"
 	"github.com/sanek1/metrics-collector/pkg/logging"
 	"go.uber.org/zap"
 )
 
 type App struct {
-	controller *c.Controller
-	addr       string
-
+	controller    *c.Controller
+	addr          string
 	storeInterval int64
 	path          string
 	restore       bool
 	logger        *logging.ZapLogger
-
-	store storage.Storage
+	store         storage.Storage
 }
 
-func New(addr string, storeInterval int64, path string, restore bool) *App {
+func New(opt *flags.ServerOptions) *App {
 	// init zap logger
 	logger, err := logging.NewZapLogger(zap.InfoLevel)
 	if err != nil {
 		panic(err)
 	}
 	l := startLogger()
-
+	// init db connection
+	db, err := startDB(opt)
+	if err != nil {
+		logger.ErrorCtx(context.Background(), "Error connecting to database", zap.Error(err))
+	}
 	// init storage
 	s := storage.NewMetricsStorage(l)
-
-	ctrl := c.New(s, l)
+	ctrl := c.New(s, db, l)
 
 	return &App{
-		controller: ctrl,
-		addr:       addr,
-
-		storeInterval: storeInterval,
-		path:          path,
-		restore:       restore,
+		controller:    ctrl,
+		addr:          opt.FlagRunAddr,
+		storeInterval: opt.StoreInterval,
+		path:          opt.Path,
+		restore:       opt.Restore,
 		logger:        logger,
-
-		store: s,
+		store:         s,
 	}
+}
+
+func startDB(opt *flags.ServerOptions) (*sql.DB, error) {
+	db, err := sql.Open("pgx", opt.DBPath)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = db.Ping()
+	if err != nil {
+		return nil, err
+	}
+	err = db.PingContext(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	//defer db.Close()
+
+	return db, nil
 }
 
 func startLogger() *logging.ZapLogger {

@@ -40,7 +40,8 @@ func TestController_PeriodicallySaveBackUp(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	ctrl := New(storage.NewMetricsStorage(logger), logger)
+
+	ctrl := New(storage.NewMetricsStorage(logger), nil, logger)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

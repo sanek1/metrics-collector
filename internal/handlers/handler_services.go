@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	con "context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,14 +22,36 @@ type Services struct {
 	s      storage.Storage
 	model  *m.Metrics
 	logger *l.ZapLogger
+	db     *sql.DB
 }
 
-func NewHandlerServices(st storage.Storage, model *m.Metrics, zl *l.ZapLogger) *Services {
+func NewHandlerServices(st storage.Storage, db *sql.DB, model *m.Metrics, zl *l.ZapLogger) *Services {
 	return &Services{
 		s:      st,
 		model:  model,
 		logger: zl,
+		db:     db,
 	}
+}
+
+func (s *Services) PingService(ctx con.Context, rw http.ResponseWriter) {
+	if s.db == nil {
+		s.logger.ErrorCtx(ctx, "Database is nil")
+		SendResultStatusNotOK(rw, nil)
+		return
+	}
+	row := s.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) as count FROM videos")
+
+	var id int64
+	err := row.Scan(&id)
+	if err != nil {
+		s.logger.ErrorCtx(ctx, "Error querying database", zap.Any("err", err.Error()))
+		SendResultStatusNotOK(rw, nil)
+		return
+	}
+	s.logger.InfoCtx(ctx, "PingService success")
+	SendResultStatusOK(rw, nil)
 }
 
 func (s *Services) CounterService(ctx con.Context, rw http.ResponseWriter) {

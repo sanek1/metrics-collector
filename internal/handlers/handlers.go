@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -21,10 +22,11 @@ const (
 type Storage struct {
 	Storage storage.Storage
 	Logger  *l.ZapLogger
+	db      *sql.DB
 }
 
-func NewStorage(s storage.Storage, zl *l.ZapLogger) *Storage {
-	return &Storage{Storage: s, Logger: zl}
+func NewStorage(s storage.Storage, db *sql.DB, zl *l.ZapLogger) *Storage {
+	return &Storage{Storage: s, Logger: zl, db: db}
 }
 
 func (s Storage) MainPageHandler(rw http.ResponseWriter, r *http.Request) {
@@ -80,6 +82,14 @@ func (s Storage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http.Reques
 	http.Error(rw, "No such value exists", http.StatusNotFound)
 }
 
+func (s Storage) PingDBHandler(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Content-Type", "application/json")
+	// ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// defer cancel()
+	services := NewHandlerServices(s.Storage, s.db, nil, s.Logger)
+	services.PingService(r.Context(), rw)
+}
+
 func (s Storage) GetMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 
@@ -92,7 +102,7 @@ func (s Storage) GetMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	services := NewHandlerServices(s.Storage, &model, s.Logger)
+	services := NewHandlerServices(s.Storage, s.db, &model, s.Logger)
 
 	switch model.MType {
 	case "counter":

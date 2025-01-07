@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"time"
 
@@ -17,8 +18,8 @@ type Controller struct {
 	logger  *l.ZapLogger
 }
 
-func New(s storage.Storage, logger *l.ZapLogger) *Controller {
-	r := routing.New(s, logger)
+func New(s storage.Storage, db *sql.DB, logger *l.ZapLogger) *Controller {
+	r := routing.New(s, db, logger)
 	return &Controller{
 		storage: s,
 		router:  r.InitRouting(),

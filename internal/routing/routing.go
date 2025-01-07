@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"database/sql"
 	"net/http"
 
 	"github.com/go-chi/chi"
@@ -15,17 +16,18 @@ type Controller struct {
 	l         *l.ZapLogger
 	midleware *v.MiddlewareController
 	storage   storage.Storage
-	ms        *h.Storage
+	s         *h.Storage
 }
 
-func New(s storage.Storage, logger *l.ZapLogger) *Controller {
-	return &Controller{
+func New(s storage.Storage, db *sql.DB, logger *l.ZapLogger) *Controller {
+	c := &Controller{
 		l:         logger,
 		r:         chi.NewRouter(),
 		midleware: v.New(logger),
 		storage:   s,
-		ms:        h.NewStorage(s, logger),
 	}
+	c.s = h.NewStorage(s, db, logger)
+	return c
 }
 
 func (c *Controller) InitRouting() http.Handler {
@@ -34,17 +36,18 @@ func (c *Controller) InitRouting() http.Handler {
 
 	r.Route("/", func(r chi.Router) {
 		// Get routes
-		r.Get("/*", http.HandlerFunc(c.ms.MainPageHandler))
-		r.Get("/{value}/{type}/*", http.HandlerFunc(c.ms.GetMetricsByNameHandler))
+		r.Get("/*", http.HandlerFunc(c.s.MainPageHandler))
+		r.Get("/ping/*", http.HandlerFunc(c.s.PingDBHandler))
+		r.Get("/{value}/{type}/*", http.HandlerFunc(c.s.GetMetricsByNameHandler))
 
 		// Post routes
 		r.Post("/*", c.midleware.ValidationOld(http.HandlerFunc(h.NotImplementedHandler)))
-		r.Post("/value/*", http.HandlerFunc(c.ms.GetMetricsByValueHandler))
+		r.Post("/value/*", http.HandlerFunc(c.s.GetMetricsByValueHandler))
 
 		r.Route("/update", func(r chi.Router) {
-			r.Post("/*", http.HandlerFunc(c.ms.GetMetricsHandler))
-			r.Post("/gauge/*", c.midleware.ValidationOld(http.HandlerFunc(c.ms.GetMetricsHandler)))
-			r.Post("/counter/*", c.midleware.ValidationOld(http.HandlerFunc(c.ms.GetMetricsHandler)))
+			r.Post("/*", http.HandlerFunc(c.s.GetMetricsHandler))
+			r.Post("/gauge/*", c.midleware.ValidationOld(http.HandlerFunc(c.s.GetMetricsHandler)))
+			r.Post("/counter/*", c.midleware.ValidationOld(http.HandlerFunc(c.s.GetMetricsHandler)))
 		})
 	})
 

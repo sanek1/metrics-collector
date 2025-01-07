@@ -9,7 +9,7 @@ import (
 
 func main() {
 	opt := flags.ParseServerFlags()
-	if err := app.New(opt.FlagRunAddr, opt.StoreInterval, opt.Path, opt.Restore).Run(); err != nil {
+	if err := app.New(opt).Run(); err != nil {
 		log.Fatal(err)
 	}
 }
