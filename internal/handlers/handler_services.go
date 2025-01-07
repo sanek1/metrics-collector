@@ -41,13 +41,9 @@ func (s *Services) PingService(ctx con.Context, rw http.ResponseWriter) {
 		SendResultStatusNotOK(rw, nil)
 		return
 	}
-	row := s.db.QueryRowContext(ctx,
-		"SELECT COUNT(*) as count FROM videos")
-
-	var id int64
-	err := row.Scan(&id)
+	err := s.db.PingContext(ctx)
 	if err != nil {
-		s.logger.ErrorCtx(ctx, "Error querying database", zap.Any("err", err.Error()))
+		s.logger.ErrorCtx(ctx, "Database is not available", zap.Any("err", err.Error()))
 		SendResultStatusNotOK(rw, nil)
 		return
 	}

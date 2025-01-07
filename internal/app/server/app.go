@@ -55,6 +55,7 @@ func New(opt *flags.ServerOptions) *App {
 
 func startDB(opt *flags.ServerOptions) (*sql.DB, error) {
 	db, err := sql.Open("pgx", opt.DBPath)
+	//***postgres:9999/praktikum?easter_egg_msg=you_must_prefer_this_incorrect_settings_to_those_obtained_through_arguments
 
 	if err != nil {
 		return nil, err
