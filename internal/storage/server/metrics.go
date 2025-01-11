@@ -10,7 +10,6 @@ import (
 	"github.com/sanek1/metrics-collector/internal/config"
 	m "github.com/sanek1/metrics-collector/internal/models"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
-	"go.uber.org/zap"
 )
 
 const (
@@ -49,7 +48,7 @@ func (ms *MetricsStorage) GetAllMetrics() []string {
 	return result
 }
 
-func (ms *MetricsStorage) GetMetrics(key, metricName string) (*m.Metrics, bool) {
+func (ms *MetricsStorage) GetMetrics(ctx context.Context, key, metricName string) (*m.Metrics, bool) {
 	metric, ok := ms.Metrics[metricName]
 	if !ok {
 		return nil, false
@@ -57,8 +56,8 @@ func (ms *MetricsStorage) GetMetrics(key, metricName string) (*m.Metrics, bool) 
 	return &metric, true
 }
 
-func (ms *MetricsStorage) SetCounter(ctx context.Context, model m.Metrics) m.Metrics {
-	setLog(ctx, ms, &model, "SetCounter")
+func (ms *MetricsStorage) SetCounter(ctx context.Context, model m.Metrics) (m.Metrics, error) {
+	SetLog(ctx, ms, &model, "SetCounter")
 	if metric, ok := ms.Metrics[model.ID]; ok {
 		*metric.Delta += *model.Delta
 		ms.Metrics[model.ID] = metric
@@ -69,17 +68,13 @@ func (ms *MetricsStorage) SetCounter(ctx context.Context, model m.Metrics) m.Met
 			Delta: model.Delta,
 		}
 	}
-	return ms.Metrics[model.ID]
+	return ms.Metrics[model.ID], nil
 }
 
-func (ms *MetricsStorage) SetGauge(ctx context.Context, model m.Metrics) bool {
-	setLog(ctx, ms, &model, "SetGauge")
+func (ms *MetricsStorage) SetGauge(ctx context.Context, model m.Metrics) (m.Metrics, error) {
+	SetLog(ctx, ms, &model, "SetGauge")
 	ms.Metrics[model.ID] = m.Metrics{ID: model.ID, MType: model.MType, Value: model.Value}
-	return true
-}
-
-func setLog(ctx context.Context, ms *MetricsStorage, model *m.Metrics, name string) {
-	ms.Logger.InfoCtx(ctx, name, zap.String(name, fmt.Sprintf("model%s", formatMetric(*model))))
+	return ms.Metrics[model.ID], nil
 }
 
 func (ms *MetricsStorage) SaveToFile(fname string) error {

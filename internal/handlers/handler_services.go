@@ -52,7 +52,12 @@ func (s *Services) PingService(ctx con.Context, rw http.ResponseWriter) {
 }
 
 func (s *Services) CounterService(ctx con.Context, rw http.ResponseWriter) {
-	model := s.s.SetCounter(ctx, *s.model)
+	model, err := s.s.SetCounter(ctx, *s.model)
+	if err != nil {
+		s.logger.ErrorCtx(ctx, "The metric was not saved", zap.Any("err", err.Error()))
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	resp, err := json.Marshal(model)
 	if err != nil {
 		s.logger.ErrorCtx(ctx, "The metric was not parsed", zap.Any("err", err.Error()))
@@ -63,12 +68,13 @@ func (s *Services) CounterService(ctx con.Context, rw http.ResponseWriter) {
 }
 
 func (s *Services) GaugeService(ctx con.Context, rw http.ResponseWriter) {
-	if ok := s.s.SetGauge(ctx, *s.model); !ok {
+	model, err := s.s.SetGauge(ctx, *s.model)
+	if err != nil {
 		s.logger.ErrorCtx(ctx, "The metric was not saved", zap.Any("err", "no such value exists"))
 		http.Error(rw, "No such value exists", http.StatusNotFound)
 		return
 	}
-	resp, err := json.Marshal(s.model)
+	resp, err := json.Marshal(model)
 	if err != nil {
 		s.logger.ErrorCtx(ctx, "The metric was not marshaled", zap.Any("err", err.Error()))
 		http.Error(rw, err.Error(), http.StatusInternalServerError)

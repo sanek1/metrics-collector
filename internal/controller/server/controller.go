@@ -13,17 +13,19 @@ import (
 )
 
 type Controller struct {
-	storage storage.Storage
-	router  http.Handler
-	logger  *l.ZapLogger
+	storage    storage.Storage
+	fieStorage storage.FileStorage
+	router     http.Handler
+	logger     *l.ZapLogger
 }
 
-func New(s storage.Storage, db *sql.DB, logger *l.ZapLogger) *Controller {
-	r := routing.New(s, db, logger)
+func New(fs storage.FileStorage, s storage.Storage, conn *sql.DB, logger *l.ZapLogger) *Controller {
+	r := routing.New(s, conn, logger)
 	return &Controller{
-		storage: s,
-		router:  r.InitRouting(),
-		logger:  logger,
+		storage:    s,
+		fieStorage: fs,
+		router:     r.InitRouting(),
+		logger:     logger,
 	}
 }
 
@@ -40,14 +42,14 @@ func (c *Controller) PeriodicallySaveBackUp(ctx context.Context, filename string
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	if restore {
-		err := c.storage.LoadFromFile(filename)
+		err := c.fieStorage.LoadFromFile(filename)
 		if err != nil {
 			c.logger.ErrorCtx(ctx, "Error loading metrics from file")
 		}
 	}
 
 	for range ticker.C {
-		err := c.storage.SaveToFile(filename)
+		err := c.fieStorage.SaveToFile(filename)
 		c.logger.InfoCtx(ctx, "saving to file was successful")
 		if err != nil {
 			c.logger.ErrorCtx(ctx, "Error saving metrics to file"+err.Error())
@@ -57,7 +59,7 @@ func (c *Controller) PeriodicallySaveBackUp(ctx context.Context, filename string
 	for {
 		select {
 		case <-ticker.C:
-			err := c.storage.SaveToFile(filename)
+			err := c.fieStorage.SaveToFile(filename)
 			c.logger.InfoCtx(ctx, "saving to file was successful")
 			if err != nil {
 				c.logger.ErrorCtx(ctx, "Error saving metrics to file"+err.Error())

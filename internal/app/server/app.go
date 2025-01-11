@@ -25,7 +25,7 @@ type App struct {
 	store         storage.Storage
 }
 
-func New(opt *flags.ServerOptions) *App {
+func New(opt *flags.ServerOptions, useDatabase bool) *App {
 	// init zap logger
 	logger, err := logging.NewZapLogger(zap.InfoLevel)
 	if err != nil {
@@ -33,14 +33,18 @@ func New(opt *flags.ServerOptions) *App {
 	}
 	l := startLogger()
 	// init db connection
-	db, err := startDB(opt)
-	if err != nil {
-		logger.InfoCtx(context.Background(), opt.DBPath, zap.Error(err))
-		logger.ErrorCtx(context.Background(), "Error connecting to database", zap.Error(err))
+	var conn *sql.DB
+	if useDatabase {
+		conn, err = startDB(opt)
+		if err != nil {
+			logger.InfoCtx(context.Background(), opt.DBPath, zap.Error(err))
+			logger.ErrorCtx(context.Background(), "Error connecting to database", zap.Error(err))
+		}
 	}
-	// init storage
-	s := storage.NewMetricsStorage(l)
-	ctrl := c.New(s, db, l)
+
+	fs := storage.NewMetricsStorage(l)
+	s := storage.GetStorage(useDatabase, conn, l)
+	ctrl := c.New(fs, s, conn, l)
 
 	return &App{
 		controller:    ctrl,
@@ -55,7 +59,6 @@ func New(opt *flags.ServerOptions) *App {
 
 func startDB(opt *flags.ServerOptions) (*sql.DB, error) {
 	db, err := sql.Open("pgx", opt.DBPath)
-	//***postgres:9999/praktikum?easter_egg_msg=you_must_prefer_this_incorrect_settings_to_those_obtained_through_arguments
 
 	if err != nil {
 		return nil, err
@@ -97,7 +100,7 @@ func (a *App) Run() error {
 		IdleTimeout:       120 * time.Second,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	a.logger.InfoCtx(context.Background(), "Running server", zap.String("address%s", a.addr))
+	a.logger.InfoCtx(ctx, "Running server", zap.String("address%s", a.addr))
 	go a.controller.PeriodicallySaveBackUp(ctx, a.path, a.restore, time.Duration(a.storeInterval)*time.Second)
 	return server.ListenAndServe()
 }

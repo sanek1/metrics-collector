@@ -20,13 +20,15 @@ const (
 )
 
 type Storage struct {
-	Storage storage.Storage
-	Logger  *l.ZapLogger
-	db      *sql.DB
+	Storage         storage.Storage
+	Logger          *l.ZapLogger
+	db              *sql.DB
+	handlerServices *Services
 }
 
 func NewStorage(s storage.Storage, db *sql.DB, zl *l.ZapLogger) *Storage {
-	return &Storage{Storage: s, Logger: zl, db: db}
+	hs := NewHandlerServices(s, db, nil, zl)
+	return &Storage{Storage: s, Logger: zl, db: db, handlerServices: hs}
 }
 
 func (s Storage) MainPageHandler(rw http.ResponseWriter, r *http.Request) {
@@ -46,7 +48,7 @@ func (s Storage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.Request
 	s.Logger.InfoCtx(r.Context(),
 		fmt.Sprintf("handler GetMetricsByNameHandler. GetMetricsByNameHandler typeMetric %s nameMetric %s", typeMetric, nameMetric))
 
-	if m, ok := s.Storage.GetMetrics(typeMetric, nameMetric); ok {
+	if m, ok := s.Storage.GetMetrics(r.Context(), typeMetric, nameMetric); ok {
 		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		answer := ""
 		if m.MType == "counter" {
@@ -70,7 +72,7 @@ func (s Storage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http.Reques
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if m, ok := s.Storage.GetMetrics(model.MType, model.ID); ok {
+	if m, ok := s.Storage.GetMetrics(r.Context(), model.MType, model.ID); ok {
 		resp, err := json.Marshal(m)
 		if err != nil {
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -87,8 +89,8 @@ func (s Storage) PingDBHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 	// ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	// defer cancel()
-	services := NewHandlerServices(s.Storage, s.db, nil, s.Logger)
-	services.PingService(r.Context(), rw)
+	s.handlerServices.model = nil
+	s.handlerServices.PingService(r.Context(), rw)
 }
 
 func (s Storage) GetMetricsHandler(rw http.ResponseWriter, r *http.Request) {
@@ -102,14 +104,12 @@ func (s Storage) GetMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 		SendResultStatusNotOK(rw, []byte(`{"error": "failed to read body"}`))
 		return
 	}
-
-	services := NewHandlerServices(s.Storage, s.db, &model, s.Logger)
-
+	s.handlerServices.model = &model
 	switch model.MType {
 	case "counter":
-		services.CounterService(ctx, rw)
+		s.handlerServices.CounterService(ctx, rw)
 	case "gauge":
-		services.GaugeService(ctx, rw)
+		s.handlerServices.GaugeService(ctx, rw)
 	default:
 		http.Error(rw, "No such value exists", http.StatusNotFound)
 		return

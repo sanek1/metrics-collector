@@ -13,6 +13,7 @@ type ServerOptions struct {
 	Path          string
 	Restore       bool
 	DBPath        string
+	UseDatabase   bool
 }
 
 type DBSettings struct {
@@ -28,7 +29,7 @@ const (
 	defaultStoreInterval = 60
 	defaultFileName      = "File_Log_Store.json"
 	defaultRestore       = true
-	defaultDatabase      = "video"
+	defaultDatabase      = "MetricStore"
 	defaultHost          = "localhost"
 	defaultPort          = "5432"
 	defaultUser          = "postgres"
@@ -69,6 +70,12 @@ func ParseServerFlags() *ServerOptions {
 
 	if dbPath := os.Getenv("DATABASE_DSN"); dbPath != "" {
 		opt.DBPath = dbPath
+	}
+
+	if opt.DBPath != "" {
+		opt.UseDatabase = true
+	} else {
+		opt.UseDatabase = false
 	}
 
 	return opt
