@@ -22,7 +22,7 @@ type App struct {
 	path          string
 	restore       bool
 	logger        *logging.ZapLogger
-	store         storage.Storage
+	store         storage.MetricStorage
 }
 
 func New(opt *flags.ServerOptions, useDatabase bool) *App {

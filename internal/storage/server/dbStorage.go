@@ -186,3 +186,11 @@ func (s *DBStorage) ensureMetrics(ctx context.Context, model m.Metrics) (m.Metri
 	}
 	return *res, nil
 }
+
+func (s *DBStorage) LoadFromFile(fname string) error {
+	return fmt.Errorf("LoadFromFile is not supported for DBStorage")
+}
+
+func (s *DBStorage) SaveToFile(fname string) error {
+	return fmt.Errorf("SaveToFile is not supported for DBStorage")
+}

@@ -80,8 +80,11 @@ func (s Storage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http.Reques
 		}
 		SendResultStatusOK(rw, resp)
 		return
+	} else {
+		s.Logger.InfoCtx(r.Context(), "No such value exists id: "+model.ID)
+		http.Error(rw, "No such value exists", http.StatusNotFound)
+		return
 	}
-	http.Error(rw, "No such value exists", http.StatusNotFound)
 }
 
 func (s Storage) PingDBHandler(rw http.ResponseWriter, r *http.Request) {

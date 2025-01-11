@@ -6,10 +6,10 @@ import (
 	m "github.com/sanek1/metrics-collector/internal/models"
 )
 
-// type Storage interface {
-// 	MetricsStorage2
-// 	FileStorage
-// }
+type MetricStorage interface {
+	Storage
+	FileStorage
+}
 
 type Storage interface {
 	SetGauge(ctx context.Context, metric m.Metrics) (m.Metrics, error)                // Set the value of the gauge

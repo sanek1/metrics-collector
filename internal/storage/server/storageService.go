@@ -14,16 +14,9 @@ func SetLog(ctx context.Context, ms *MetricsStorage, model *m.Metrics, name stri
 	ms.Logger.InfoCtx(ctx, name, zap.String(name, fmt.Sprintf("model%s", formatMetric(*model))))
 }
 
-func GetStorage(useDatabase bool, conn *sql.DB, logger *l.ZapLogger) Storage {
+func GetStorage(useDatabase bool, conn *sql.DB, logger *l.ZapLogger) MetricStorage {
 	if useDatabase && conn != nil {
 		return NewDBStorage(conn, logger)
 	}
 	return NewMetricsStorage(logger)
 }
-
-// func GetDBStorage(useDatabase bool, conn *sql.DB, logger *l.ZapLogger) FileStorage {
-// 	if useDatabase && conn != nil {
-// 		return NewDBStorage(conn, logger)
-// 	}
-// 	return NewMetricsStorage(logger)
-// }
