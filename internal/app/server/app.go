@@ -27,7 +27,7 @@ type App struct {
 
 func New(opt *flags.ServerOptions, useDatabase bool) *App {
 	// init zap logger
-	logger, err := logging.NewZapLogger(zap.InfoLevel)
+	logger, err := logging.NewZapLogger(zap.ErrorLevel)
 	if err != nil {
 		panic(err)
 	}

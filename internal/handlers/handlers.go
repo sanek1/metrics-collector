@@ -75,7 +75,7 @@ func (s Storage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http.Reques
 	if m, ok := s.Storage.GetMetrics(r.Context(), model.MType, model.ID); ok {
 		resp, err := json.Marshal(m)
 		if err != nil {
-			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			s.Logger.ErrorCtx(r.Context(), "The metric not marshaled", zap.Any("err", err.Error()))
 			return
 		}
 		SendResultStatusOK(rw, resp)

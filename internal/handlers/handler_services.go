@@ -54,7 +54,11 @@ func (s *Services) PingService(ctx con.Context, rw http.ResponseWriter) {
 func (s *Services) CounterService(ctx con.Context, rw http.ResponseWriter) {
 	model, err := s.s.SetCounter(ctx, *s.model)
 	if err != nil {
-		s.logger.ErrorCtx(ctx, "The metric was not saved", zap.Any("err", err.Error()))
+		str := "The metric was not saved id: " + s.model.ID +
+			s.model.MType +
+			fmt.Sprint(s.model.Value) +
+			fmt.Sprint(s.model.Delta) + "\n" + err.Error()
+		s.logger.ErrorCtx(ctx, str, zap.Any("err", err.Error()))
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -70,7 +74,12 @@ func (s *Services) CounterService(ctx con.Context, rw http.ResponseWriter) {
 func (s *Services) GaugeService(ctx con.Context, rw http.ResponseWriter) {
 	model, err := s.s.SetGauge(ctx, *s.model)
 	if err != nil {
-		s.logger.ErrorCtx(ctx, "The metric was not saved", zap.Any("err", "no such value exists"))
+		str := "The metric was not saved id: " + s.model.ID +
+			s.model.MType +
+			fmt.Sprint(s.model.Value) +
+			fmt.Sprint(s.model.Delta) + "\n" + err.Error()
+
+		s.logger.ErrorCtx(ctx, str, zap.Any("err", "no such value exists"))
 		http.Error(rw, "No such value exists", http.StatusNotFound)
 		return
 	}

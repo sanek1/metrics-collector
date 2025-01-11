@@ -64,6 +64,10 @@ func (s *DBStorage) GetAllMetrics() []string {
 		s.Logger.ErrorCtx(context.Background(), "failed to get all metrics from database", zap.Error(err))
 		return nil
 	}
+	if rows.Err() != nil {
+		s.Logger.ErrorCtx(context.Background(), "failed to get all metrics from database", zap.Error(rows.Err()))
+		return nil
+	}
 	defer rows.Close()
 	for rows.Next() {
 		var metric m.Metrics
@@ -121,19 +125,33 @@ func (s *DBStorage) updateMetric(ctx context.Context, model m.Metrics) error {
 }
 
 func (s *DBStorage) GetMetricByTypeAndID(ctx context.Context, mType, id string) (*m.Metrics, bool) {
-	var metric m.Metrics
-	row := s.conn.QueryRowContext(ctx, `
-	 SELECT key, m_type, delta, value FROM metrics WHERE m_type=$1 AND key=$2
-	`, mType, id)
+	const query = "SELECT key, m_type, delta, value FROM metrics WHERE m_type=$1 AND key=$2"
+	metric := new(m.Metrics)
 
-	err := row.Scan(&metric.ID, &metric.MType, &metric.Delta, &metric.Value)
-	if err == sql.ErrNoRows {
-		return nil, false
-	} else if err != nil {
-		s.Logger.ErrorCtx(ctx, "failed to query Metric by type and ID", zap.Error(err))
-		return nil, false
+	row := s.conn.QueryRowContext(ctx, query, mType, id)
+	var delta sql.NullInt64
+	var value sql.NullFloat64
+	err := row.Scan(&metric.ID, &metric.MType, &delta, &value)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			s.Logger.InfoCtx(ctx, "metric not found", zap.String("mType", mType), zap.String("id", id))
+			return metric, false
+		} else {
+			s.Logger.ErrorCtx(ctx, "failed to query Metric by type and ID"+id+err.Error(),
+				zap.String("mType", mType),
+				zap.String("id", id),
+				zap.Error(err))
+			return nil, false
+		}
 	}
-	return &metric, true
+	if delta.Valid {
+		metric.Delta = &delta.Int64
+	}
+	if value.Valid {
+		metric.Value = &value.Float64
+	}
+
+	return metric, true
 }
 
 func (s *DBStorage) SetCounter(ctx context.Context, model m.Metrics) (m.Metrics, error) {
@@ -146,20 +164,24 @@ func (s *DBStorage) SetGauge(ctx context.Context, model m.Metrics) (m.Metrics, e
 
 func (s *DBStorage) ensureMetrics(ctx context.Context, model m.Metrics) (m.Metrics, error) {
 	if err := s.ensureMetricsTableExists(ctx); err != nil {
+		s.Logger.ErrorCtx(ctx, "failed to ensure Metrics table exists", zap.Error(err))
 		return m.Metrics{}, err
 	}
 	_, found := s.GetMetricByTypeAndID(ctx, model.MType, model.ID)
 	if found {
 		if err := s.updateMetric(ctx, model); err != nil {
+			s.Logger.ErrorCtx(ctx, "failed to update metric", zap.Error(err))
 			return m.Metrics{}, err
 		}
 	} else {
 		if err := s.insertMetric(ctx, model); err != nil {
+			s.Logger.ErrorCtx(ctx, "failed to insert metric", zap.Error(err))
 			return m.Metrics{}, err
 		}
 	}
 	res, found := s.GetMetricByTypeAndID(ctx, model.MType, model.ID)
 	if !found {
+		s.Logger.InfoCtx(ctx, "failed to find inserted/updated metric", zap.String("id", model.ID))
 		return m.Metrics{}, fmt.Errorf("metric not found")
 	}
 	return *res, nil

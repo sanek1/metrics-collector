@@ -48,7 +48,7 @@ func SendToServer(client *http.Client, url string, m models.Metrics, l *logging.
 
 	resp, err := client.Do(req)
 	if err != nil {
-		l.ErrorCtx(ctx, "compressedBody11", zap.String("", fmt.Sprintf("Error sending request:%v", err)))
+		l.InfoCtx(ctx, "compressedBody11", zap.String("", fmt.Sprintf("Error sending request:%v", err)))
 		return err
 	}
 
