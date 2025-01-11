@@ -71,7 +71,6 @@ func startDB(opt *flags.ServerOptions) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	// defer db.Close()
 	return db, nil
 }
 

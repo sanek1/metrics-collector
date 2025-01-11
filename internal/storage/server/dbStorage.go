@@ -23,13 +23,13 @@ func NewDBStorage(c *sql.DB, logger *l.ZapLogger) *DBStorage {
 	}
 }
 
-func (ds *DBStorage) IsOK() bool {
-	if ds.conn == nil {
+func (s *DBStorage) IsOK() bool {
+	if s.conn == nil {
 		return false
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	if err := ds.conn.PingContext(ctx); err != nil {
+	if err := s.conn.PingContext(ctx); err != nil {
 		return false
 	}
 	return true
@@ -58,7 +58,7 @@ func (s DBStorage) ensureMetricsTableExists(ctx context.Context) error {
 }
 
 func (s *DBStorage) GetAllMetrics() []string {
-	var metrics []string
+	var res []string
 	rows, err := s.conn.Query("SELECT key, m_type, delta, value FROM metrics")
 	if err != nil {
 		s.Logger.ErrorCtx(context.Background(), "failed to get all metrics from database", zap.Error(err))
@@ -71,9 +71,9 @@ func (s *DBStorage) GetAllMetrics() []string {
 			s.Logger.ErrorCtx(context.Background(), "failed to scan metric from database", zap.Error(err))
 			continue
 		}
-		metrics = append(metrics, metric.ID)
+		res = append(res, metric.ID)
 	}
-	return metrics
+	return res
 }
 
 func (s *DBStorage) GetMetrics(ctx context.Context, mType, id string) (*m.Metrics, bool) {
