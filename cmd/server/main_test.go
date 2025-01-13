@@ -33,7 +33,7 @@ func TestRouter(t *testing.T) {
 	memStorage := h.NewStorage(s, nil, l)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		v.GzipMiddleware(http.HandlerFunc(memStorage.GetMetricsHandler)).ServeHTTP(w, r)
+		v.GzipMiddleware(http.HandlerFunc(memStorage.MetricHandler)).ServeHTTP(w, r)
 	})
 
 	srv := httptest.NewServer(handler)
@@ -82,7 +82,7 @@ func TestGzipCompression(t *testing.T) {
 	ms := h.NewStorage(s, nil, l)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		v.GzipMiddleware(http.HandlerFunc(ms.GetMetricsHandler)).ServeHTTP(w, r)
+		v.GzipMiddleware(http.HandlerFunc(ms.MetricHandler)).ServeHTTP(w, r)
 	})
 
 	srv := httptest.NewServer(handler)

@@ -67,7 +67,9 @@ func (s Storage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.Request
 
 func (s Storage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
-	model, err := ParseMetricServices(rw, r)
+	models, err := s.handlerServices.ParseMetricsServices(rw, r)
+	model := &models[0]
+
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
@@ -87,26 +89,38 @@ func (s Storage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http.Reques
 	}
 }
 
-func (s Storage) PingDBHandler(rw http.ResponseWriter, r *http.Request) {
-	s.Logger.InfoCtx(r.Context(), "handler PingDBHandler")
-	rw.Header().Set("Content-Type", "application/json")
-	s.handlerServices.model = nil
-	s.handlerServices.PingService(r.Context(), rw)
-}
-
-func (s Storage) GetMetricsHandler(rw http.ResponseWriter, r *http.Request) {
+func (s Storage) MetricsHandler(rw http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 
-	model, err := ParseMetricServices(rw, r)
-	ctx = s.Logger.WithContextFields(ctx,
-		zap.String("type", model.MType))
+	models, err := s.handlerServices.ParseMetricsServices(rw, r)
 	if err != nil {
 		s.Logger.ErrorCtx(ctx, "The metric was not parsed", zap.Any("err", err.Error()))
 		SendResultStatusNotOK(rw, []byte(`{"error": "failed to read body"}`))
 		return
 	}
-	s.handlerServices.model = &model
-	switch model.MType {
+	if len(models) <= 0 {
+		s.Logger.InfoCtx(ctx, "No such value exists")
+		http.Error(rw, "No such value exists", http.StatusNotFound)
+		return
+	}
+	s.handlerServices.models = &models
+	s.handlerServices.GaugeService(ctx, rw)
+}
+
+// ПЕРЕПИСАТЬ
+func (s Storage) MetricHandler(rw http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+	models, err := s.handlerServices.ParseMetricsServices(rw, r)
+	if err != nil {
+		s.Logger.ErrorCtx(ctx, "The metric was not parsed", zap.Any("err", err.Error()))
+		SendResultStatusNotOK(rw, []byte(`{"error": "failed to read body"}`))
+		return
+	}
+	ctx = s.Logger.WithContextFields(ctx,
+		zap.String("type", models[0].MType))
+
+	s.handlerServices.models = &models
+	switch models[0].MType {
 	case "counter":
 		s.handlerServices.CounterService(ctx, rw)
 	case "gauge":
@@ -125,6 +139,13 @@ func (s Storage) SaveToFile(fname string) error {
 	}
 	// save to file
 	return os.WriteFile(fname, data, fileMode)
+}
+
+func (s Storage) PingDBHandler(rw http.ResponseWriter, r *http.Request) {
+	s.Logger.InfoCtx(r.Context(), "handler PingDBHandler")
+	rw.Header().Set("Content-Type", "application/json")
+	s.handlerServices.models = nil
+	s.handlerServices.PingService(r.Context(), rw)
 }
 
 func NotImplementedHandler(rw http.ResponseWriter, r *http.Request) {

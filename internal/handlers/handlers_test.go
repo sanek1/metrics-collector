@@ -29,7 +29,7 @@ func TestGetMetricsByBody(t *testing.T) {
 		{
 			name: "counter",
 			model: m.Metrics{
-				ID:    "test1",
+				ID:    "test3",
 				MType: "counter",
 				Delta: &value2,
 			},
@@ -44,6 +44,22 @@ func TestGetMetricsByBody(t *testing.T) {
 			},
 			expectedStatus: http.StatusOK,
 		},
+		// {
+		// 	name: "counter",
+		// 	model: []m.Metrics{
+		// 		{
+		// 			ID:    "test1",
+		// 			MType: "counter",
+		// 			Value: &value1,
+		// 		},
+		// 		{
+		// 			ID:    "test2",
+		// 			MType: "gauge",
+		// 			Delta: &value2,
+		// 		},
+		// 	},
+		// 	expectedStatus: http.StatusOK,
+		// },
 	}
 
 	ctx := context.Background()
@@ -56,18 +72,11 @@ func TestGetMetricsByBody(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// s := Storage{
-			// 	Storage: &storage.MetricsStorage{
-			// 		Metrics: make(map[string]m.Metrics),
-			// 		Logger:  l,
-			// 	},
-			// }
-
 			b, _ := json.Marshal(test.model)
 			req, err := http.NewRequestWithContext(ctx, "POST", "/", bytes.NewBuffer(b))
 			require.NoError(t, err)
 			w := httptest.NewRecorder()
-			memStorage.GetMetricsHandler(w, req)
+			memStorage.MetricHandler(w, req)
 
 			assert.Equal(t, test.expectedStatus, w.Code)
 		})

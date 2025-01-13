@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	m "github.com/sanek1/metrics-collector/internal/models"
@@ -85,106 +86,181 @@ func (s *DBStorage) GetMetrics(ctx context.Context, mType, id string) (*m.Metric
 	metric.ID = id
 	metric.MType = mType
 
-	model, found := s.GetMetricByTypeAndID(ctx, metric.MType, metric.ID)
-	if !found {
+	models, err := s.getMetricsOnDBs(ctx, metric)
+	if err != nil {
 		return nil, false
 	}
+	if len(models) == 0 {
+		return nil, false
+	}
+	model := models[0]
+
 	return model, true
 }
 
-func (s *DBStorage) insertMetric(ctx context.Context, model m.Metrics) error {
-	stmt, err := s.conn.PrepareContext(ctx, `
-	 INSERT INTO metrics ("key", m_type, value, delta) VALUES ($1, $2, $3, $4)
-	`)
+func (s *DBStorage) updateMetric(ctx context.Context, models []m.Metrics) error {
+	stmt1, err := s.conn.PrepareContext(ctx, `
+       UPDATE metrics SET delta=delta+$1 WHERE m_type=$2 AND key=$3
+    `)
 	if err != nil {
-		return fmt.Errorf("failed to prepare statement for inserting metric: %w", err)
+		s.Logger.ErrorCtx(ctx, "failed to prepare statement for updating metrics: %w", zap.Error(err))
+		return fmt.Errorf("failed to prepare statement for updating metrics: %w", err)
 	}
-	defer stmt.Close()
-
-	_, err = stmt.ExecContext(ctx, model.ID, model.MType, model.Value, model.Delta)
+	stmt2, err := s.conn.PrepareContext(ctx, `
+       UPDATE metrics SET value=$1 WHERE m_type=$2 AND key=$3
+    `)
 	if err != nil {
-		return fmt.Errorf("failed to insert metric: %w", err)
+		s.Logger.ErrorCtx(ctx, "failed to prepare statement for updating metrics: %w", zap.Error(err))
+		return fmt.Errorf("failed to prepare statement for updating metrics: %w", err)
 	}
-	return nil
-}
+	defer stmt1.Close()
+	defer stmt2.Close()
 
-func (s *DBStorage) updateMetric(ctx context.Context, model m.Metrics) error {
-	stmt, err := s.conn.PrepareContext(ctx, `
-	 UPDATE metrics SET value=$1, delta=delta+$2 WHERE m_type=$3 AND key=$4
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to prepare statement for updating metric: %w", err)
-	}
-	defer stmt.Close()
-
-	_, err = stmt.ExecContext(ctx, model.Value, model.Delta, model.MType, model.ID)
-	if err != nil {
-		return fmt.Errorf("failed to update metric: %w", err)
-	}
-	return nil
-}
-
-func (s *DBStorage) GetMetricByTypeAndID(ctx context.Context, mType, id string) (*m.Metrics, bool) {
-	const query = "SELECT key, m_type, delta, value FROM metrics WHERE m_type=$1 AND key=$2"
-	metric := new(m.Metrics)
-
-	row := s.conn.QueryRowContext(ctx, query, mType, id)
-	var delta sql.NullInt64
-	var value sql.NullFloat64
-	err := row.Scan(&metric.ID, &metric.MType, &delta, &value)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			s.Logger.InfoCtx(ctx, "metric not found", zap.String("mType", mType), zap.String("id", id))
-			return metric, false
-		} else {
-			s.Logger.ErrorCtx(ctx, "failed to query Metric by type and ID"+id+err.Error(),
-				zap.String("mType", mType),
-				zap.String("id", id),
-				zap.Error(err))
-			return nil, false
+	for _, model := range models {
+		if model.MType == "counter" {
+			_, err = stmt1.ExecContext(ctx, model.Delta, model.MType, model.ID)
+			if err != nil {
+				s.Logger.ErrorCtx(ctx, "failed to update metric counter"+model.ID, zap.String("id", model.ID))
+				return fmt.Errorf("failed to update metric counter: %w", err)
+			}
+		}
+		if model.MType == "gauge" {
+			_, err = stmt2.ExecContext(ctx, model.Value, model.MType, model.ID)
+			if err != nil {
+				s.Logger.ErrorCtx(ctx, "failed to update metric gauge: %w", zap.String("id", model.ID))
+				return fmt.Errorf("failed to update metric gauge: %w", err)
+			}
 		}
 	}
-	if delta.Valid {
-		metric.Delta = &delta.Int64
+	return nil
+}
+
+func (s *DBStorage) insertMetric(ctx context.Context, models []m.Metrics) error {
+	stmt, err := s.conn.PrepareContext(ctx, `
+       INSERT INTO metrics ("key", m_type, value, delta) VALUES ($1, $2, $3, $4)
+    `)
+	if err != nil {
+		s.Logger.ErrorCtx(ctx, "failed to prepare statement for inserting metrics: %w", zap.Error(err))
+		return fmt.Errorf("failed to prepare statement for inserting metrics: %w", err)
 	}
-	if value.Valid {
-		metric.Value = &value.Float64
+	defer stmt.Close()
+
+	for _, model := range models {
+		_, err = stmt.ExecContext(ctx, model.ID, model.MType, model.Value, model.Delta)
+		if err != nil {
+			s.Logger.ErrorCtx(ctx, "failed to insert metric: %w", zap.Error(err))
+			return fmt.Errorf("failed to insert metric: %w", err)
+		}
+	}
+	return nil
+}
+func (s *DBStorage) getMetricsOnDBs(ctx context.Context, metrics ...m.Metrics) ([]*m.Metrics, error) {
+	if len(metrics) == 0 {
+		return nil, nil
 	}
 
-	return metric, true
+	mTypes := make([]string, 0, len(metrics))
+	keys := make([]string, 0, len(metrics))
+	for _, metric := range metrics {
+		mTypes = append(mTypes, metric.MType)
+		keys = append(keys, metric.ID)
+	}
+
+	mTypePlaceholders := make([]string, len(mTypes))
+	keyPlaceholders := make([]string, len(keys))
+	for i := range mTypePlaceholders {
+		mTypePlaceholders[i] = fmt.Sprintf("$%d", i+1)
+	}
+	for i := range keyPlaceholders {
+		keyPlaceholders[i] = fmt.Sprintf("$%d", len(mTypePlaceholders)+i+1)
+	}
+
+	query := fmt.Sprintf(`
+        SELECT key, m_type, delta, value 
+        FROM metrics 
+        WHERE m_type IN (%s) AND key IN (%s)
+    `,
+		strings.Join(mTypePlaceholders, ","),
+		strings.Join(keyPlaceholders, ","),
+	)
+
+	args := make([]interface{}, 0, len(mTypes)+len(keys))
+	for _, v := range mTypes {
+		args = append(args, v)
+	}
+	for _, v := range keys {
+		args = append(args, v)
+	}
+
+	rows, err := s.conn.QueryContext(ctx, query, args...)
+	if err != nil {
+		s.Logger.ErrorCtx(ctx, "Failed to execute query", zap.Error(err))
+		return nil, err
+	}
+	defer rows.Close()
+	results := make([]*m.Metrics, 0, len(mTypes))
+	for rows.Next() {
+		metric := new(m.Metrics)
+		var delta sql.NullInt64
+		var value sql.NullFloat64
+		if err := rows.Scan(&metric.ID, &metric.MType, &delta, &value); err != nil {
+			s.Logger.ErrorCtx(ctx, "Failed to scan row", zap.Error(err))
+			continue
+		}
+		if delta.Valid {
+			metric.Delta = &delta.Int64
+		}
+		if value.Valid {
+			metric.Value = &value.Float64
+		}
+		results = append(results, metric)
+	}
+
+	if err := rows.Err(); err != nil {
+		s.Logger.ErrorCtx(ctx, "Failed to iterate over rows", zap.Error(err))
+		return nil, err
+	}
+
+	return results, nil
 }
 
-func (s *DBStorage) SetCounter(ctx context.Context, model m.Metrics) (m.Metrics, error) {
-	return s.ensureMetrics(ctx, model)
+func (s *DBStorage) SetCounter(ctx context.Context, models ...m.Metrics) ([]*m.Metrics, error) {
+	return s.ensureMetrics(ctx, models...)
 }
 
-func (s *DBStorage) SetGauge(ctx context.Context, model m.Metrics) (m.Metrics, error) {
-	return s.ensureMetrics(ctx, model)
+func (s *DBStorage) SetGauge(ctx context.Context, models ...m.Metrics) ([]*m.Metrics, error) {
+	return s.ensureMetrics(ctx, models...)
 }
 
-func (s *DBStorage) ensureMetrics(ctx context.Context, model m.Metrics) (m.Metrics, error) {
+func (s *DBStorage) ensureMetrics(ctx context.Context, models ...m.Metrics) ([]*m.Metrics, error) {
 	if err := s.ensureMetricsTableExists(ctx); err != nil {
 		s.Logger.ErrorCtx(ctx, "failed to ensure Metrics table exists", zap.Error(err))
-		return m.Metrics{}, err
+		return nil, err
 	}
-	_, found := s.GetMetricByTypeAndID(ctx, model.MType, model.ID)
-	if found {
-		if err := s.updateMetric(ctx, model); err != nil {
+	res, err := s.getMetricsOnDBs(ctx, models...)
+	if err != nil {
+		return nil, err
+	}
+	if len(res) != 0 {
+		if err := s.updateMetric(ctx, models); err != nil {
 			s.Logger.ErrorCtx(ctx, "failed to update metric", zap.Error(err))
-			return m.Metrics{}, err
+			return nil, err
 		}
 	} else {
-		if err := s.insertMetric(ctx, model); err != nil {
+		if err := s.insertMetric(ctx, models); err != nil {
 			s.Logger.ErrorCtx(ctx, "failed to insert metric", zap.Error(err))
-			return m.Metrics{}, err
+			return nil, err
 		}
 	}
-	res, found := s.GetMetricByTypeAndID(ctx, model.MType, model.ID)
-	if !found {
-		s.Logger.InfoCtx(ctx, "failed to find inserted/updated metric", zap.String("id", model.ID))
-		return m.Metrics{}, fmt.Errorf("metric not found")
+	res, err = s.getMetricsOnDBs(ctx, models...)
+	if err != nil {
+		return nil, err
 	}
-	return *res, nil
+	if len(models) < 1 {
+		s.Logger.InfoCtx(ctx, "failed to find inserted/updated metric", zap.Error(err))
+		return nil, fmt.Errorf("metric not found")
+	}
+	return res, nil
 }
 
 func (s *DBStorage) LoadFromFile(fname string) error {

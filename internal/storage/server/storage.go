@@ -12,8 +12,8 @@ type MetricStorage interface {
 }
 
 type Storage interface {
-	SetGauge(ctx context.Context, metric m.Metrics) (m.Metrics, error)                // Set the value of the gauge
-	SetCounter(ctx context.Context, metric m.Metrics) (m.Metrics, error)              // Set the value of the counter
+	SetGauge(ctx context.Context, models ...m.Metrics) ([]*m.Metrics, error)          // Set the value of the gauge
+	SetCounter(ctx context.Context, models ...m.Metrics) ([]*m.Metrics, error)        // Set the value of the counter
 	GetAllMetrics() []string                                                          // Get all metrics
 	GetMetrics(ctx context.Context, metricType, metricName string) (*m.Metrics, bool) // Get the value of the metric
 }
