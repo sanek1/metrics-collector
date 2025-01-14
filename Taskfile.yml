@@ -95,6 +95,7 @@ tasks:
         - metricstest -test.v -test.run=^TestIteration11$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080  -database-dsn="host=localhost port=5432 user=postgres password=admin dbname=MetricStore sslmode=disable" >> logs/test11.log
 
         - metricstest -test.v -test.run=^TestIteration12$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080  -database-dsn="host=localhost port=5432 user=postgres password=admin dbname=MetricStore sslmode=disable" >> logs/test12.log
+        - metricstest -test.v -test.run=^TestIteration13$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080  -database-dsn="host=localhost port=5432 user=postgres password=admin dbname=MetricStore sslmode=disable" >> logs/test13.log
         - mv ./BACKUP ./.runtime/
 
 
