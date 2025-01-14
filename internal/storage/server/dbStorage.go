@@ -136,6 +136,7 @@ func (s *DBStorage) insertMetric(ctx context.Context, models []m.Metrics) error 
 }
 
 func (s *DBStorage) getMetricsOnDBs(ctx context.Context, metrics ...m.Metrics) ([]*m.Metrics, error) {
+	s.Logger.InfoCtx(ctx, "getMetricsOnDBs"+"mtypes	"+fmt.Sprintf("%v", metrics), zap.Any("metrics", metrics))
 	query, mTypes, args := CollectorQuery(ctx, metrics)
 	rows, err := s.conn.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -153,8 +154,12 @@ func (s *DBStorage) getMetricsOnDBs(ctx context.Context, metrics ...m.Metrics) (
 			s.Logger.ErrorCtx(ctx, "Failed to scan row", zap.Error(err))
 			continue
 		}
-		metric.Delta = &delta.Int64
-		metric.Value = &value.Float64
+		if delta.Valid {
+			metric.Delta = &delta.Int64
+		}
+		if value.Valid {
+			metric.Value = &value.Float64
+		}
 		results = append(results, metric)
 	}
 

@@ -5,6 +5,7 @@ go 1.22.9
 require (
 	github.com/go-chi/chi v1.5.5
 	github.com/jackc/pgx/v5 v5.7.2
+	github.com/lib/pq v1.10.9
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
 )

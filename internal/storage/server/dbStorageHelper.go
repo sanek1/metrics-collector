@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"strings"
 
+	"github.com/lib/pq"
 	m "github.com/sanek1/metrics-collector/internal/models"
 	"go.uber.org/zap"
 )
@@ -92,15 +93,8 @@ func CollectorQuery(ctx context.Context, metrics []m.Metrics) (query string, mTy
 	query = `
 	SELECT key, m_type, delta, value
 	FROM metrics
-	WHERE m_type IN (?) AND key IN (?)
-`
-
-	args = make([]interface{}, 0, len(mTypes)+len(keys))
-	for _, v := range mTypes {
-		args = append(args, v)
-	}
-	for _, v := range keys {
-		args = append(args, v)
-	}
+	WHERE m_type = ANY($1) AND key = ANY($2)
+  `
+	args = []interface{}{pq.Array(mTypes), pq.Array(keys)}
 	return query, mTypes, args
 }

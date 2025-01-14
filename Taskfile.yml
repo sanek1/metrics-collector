@@ -57,7 +57,7 @@ tasks:
   lint:
       desc: Run linters using golangci-lint
       cmds:
-        - go build cmd/server/*.go
+        #- go build cmd/server/*.go
         - golangci-lint run --config .golangci.yml
       silent: true
   clear:
@@ -72,7 +72,7 @@ tasks:
       cmds:
         - go fmt ./...
         - go vet ./...
-        - go build cmd/server/*.go
+        #- go build cmd/server/*.go
         - go build -o ./.runtime/agent ./cmd/agent/*.go
         - go build -o ./.runtime/server ./cmd/server/*.go
       silent: true
@@ -92,7 +92,7 @@ tasks:
   
         # - metricstest -test.v -test.run=^TestIteration10[AB]$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080  -database-dsn="%DB_DSN%" >> logs/test10.log
 
-        - metricstest -test.v -test.run=^TestIteration11[AB]$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080  -database-dsn="host=localhost port=5432 user=postgres password=admin dbname=MetricStore sslmode=disable" >> logs/test11.log
+        - metricstest -test.v -test.run=^TestIteration11$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080  -database-dsn="host=localhost port=5432 user=postgres password=admin dbname=MetricStore sslmode=disable" >> logs/test11.log
 
         - metricstest -test.v -test.run=^TestIteration12$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080  -database-dsn="host=localhost port=5432 user=postgres password=admin dbname=MetricStore sslmode=disable" >> logs/test12.log
         - mv ./BACKUP ./.runtime/
