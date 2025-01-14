@@ -98,7 +98,7 @@ func (s Storage) MetricsHandler(rw http.ResponseWriter, r *http.Request) {
 		SendResultStatusNotOK(rw, []byte(`{"error": "failed to read body"}`))
 		return
 	}
-	if len(models) <= 0 {
+	if len(models) == 0 {
 		s.Logger.InfoCtx(ctx, "No such value exists")
 		http.Error(rw, "No such value exists", http.StatusNotFound)
 		return

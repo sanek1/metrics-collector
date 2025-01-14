@@ -123,11 +123,8 @@ func (ms *MetricsStorage) SetGauge(ctx context.Context, models ...m.Metrics) ([]
 	if hasErrors {
 		return results, fmt.Errorf("errors: %v", errors)
 	}
-
 	return results, nil
-
 }
-
 func (ms *MetricsStorage) SaveToFile(fname string) error {
 	// serialize to json
 	data, err := json.MarshalIndent(ms.Metrics, "", "   ")

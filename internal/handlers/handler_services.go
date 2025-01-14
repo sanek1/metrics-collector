@@ -36,8 +36,6 @@ type MetricsServiceInterface interface {
 func NewHandlerServices(st storage.Storage,
 	db *sql.DB,
 	models *[]m.Metrics,
-	//sss SetGaugeInterface,
-	// MetricsServiceInterface,
 	zl *l.ZapLogger) *Services {
 	return &Services{
 		s:      st,
@@ -48,25 +46,21 @@ func NewHandlerServices(st storage.Storage,
 }
 
 func (s *Services) PingService(ctx con.Context, rw http.ResponseWriter) {
-	s.logger.InfoCtx(ctx, "PingService start")
 	if s.db == nil {
 		s.logger.ErrorCtx(ctx, "Database is nil")
 		SendResultStatusNotOK(rw, nil)
 		return
 	}
-	err := s.db.PingContext(ctx)
-	if err != nil {
-		s.logger.ErrorCtx(ctx, "Database is not available", zap.Any("err", err.Error()))
+	if err := s.db.PingContext(ctx); err != nil {
+		s.logger.ErrorCtx(ctx, "Database is not available", zap.Error(err))
 		SendResultStatusNotOK(rw, nil)
 		return
 	}
-	s.logger.InfoCtx(ctx, "PingService success")
 	SendResultStatusOK(rw, nil)
 }
 
 func (s *Services) CounterService(ctx con.Context, rw http.ResponseWriter) {
-	var models []m.Metrics
-	models = *s.models
+	models := *s.models
 	updatedModels, err := s.s.SetCounter(ctx, models...)
 	if err != nil {
 		s.logger.ErrorCtx(ctx, "The metric counter was not saved", zap.Any("err", err.Error()))
@@ -77,12 +71,10 @@ func (s *Services) CounterService(ctx con.Context, rw http.ResponseWriter) {
 }
 
 func (s *Services) GaugeService(ctx con.Context, rw http.ResponseWriter) {
-	var models []m.Metrics
-	models = *s.models
+	models := *s.models
 	updatedModels, err := s.s.SetGauge(ctx, models...)
 	if err != nil {
-		str := "One or more metrics were not saved: " + err.Error() + "\n"
-		s.logger.ErrorCtx(ctx, str, zap.Any("err", "metrics not saved"))
+		s.logger.ErrorCtx(ctx, "One or more metrics were not saved", zap.Any("err", err.Error()))
 		http.Error(rw, "One or more metrics were not saved", http.StatusInternalServerError)
 		return
 	}
@@ -91,20 +83,23 @@ func (s *Services) GaugeService(ctx con.Context, rw http.ResponseWriter) {
 		s.MetricsService(ctx, rw, res)
 		return
 	}
-
 	s.MetricsService(ctx, rw, updatedModels...)
 }
 
 func (s *Services) MetricsService(ctx con.Context, rw http.ResponseWriter, models ...*m.Metrics) {
-	var err error
-	var resp []byte
-
 	if len(models) == 1 {
-		resp, err = json.Marshal(models[0])
-	} else {
-		resp, err = json.Marshal(models)
+		model := models[0]
+		resp, err := json.Marshal(model)
+		if err != nil {
+			s.logger.ErrorCtx(ctx, "The metric was not marshaled", zap.Any("err", err.Error()))
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		SendResultStatusOK(rw, resp)
+		return
 	}
 
+	resp, err := json.Marshal(models)
 	if err != nil {
 		s.logger.ErrorCtx(ctx, "The metric was not marshaled", zap.Any("err", err.Error()))
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -184,7 +179,6 @@ func SendResultStatusNotOK(rw http.ResponseWriter, resp []byte) {
 func (s *Services) buildJSONBody(rw http.ResponseWriter, r *http.Request) (err error) {
 	key, name, val, err := readingDataFromURL(r)
 	if err != nil {
-		fmt.Println("url parsing")
 		http.Error(rw, "The value does not match the expected type.", http.StatusBadRequest)
 		return err
 	}

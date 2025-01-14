@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 	"time"
 
 	m "github.com/sanek1/metrics-collector/internal/models"
@@ -34,28 +33,6 @@ func (s *DBStorage) IsOK() bool {
 		return false
 	}
 	return true
-}
-
-func (s DBStorage) ensureMetricsTableExists(ctx context.Context) error {
-	var metrics string
-	err := s.conn.QueryRowContext(ctx, `SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename='metrics'`).Scan(&metrics)
-	if err == sql.ErrNoRows {
-		_, err := s.conn.ExecContext(ctx, `
-		CREATE TABLE metrics (
-			id serial PRIMARY KEY,
-			key text,
-			m_type text,
-			delta integer,
-			value double precision
-		)
-	`)
-		if err != nil {
-			s.Logger.ErrorCtx(ctx, "failed to create Metrics table", zap.Error(err))
-			return err
-		}
-		s.Logger.InfoCtx(ctx, "created Metrics table")
-	}
-	return nil
 }
 
 func (s *DBStorage) GetAllMetrics() []string {
@@ -120,7 +97,10 @@ func (s *DBStorage) updateMetric(ctx context.Context, models []m.Metrics) error 
 		if model.MType == "counter" {
 			_, err = stmt1.ExecContext(ctx, model.Delta, model.MType, model.ID)
 			if err != nil {
-				s.Logger.ErrorCtx(ctx, "failed to update metric counter"+model.ID, zap.String("id", model.ID))
+				s.Logger.ErrorCtx(ctx, "failed to update metric counter"+model.ID+
+					model.ID+" with Delta "+fmt.Sprintf("%d", model.Delta)+
+					"err "+err.Error(),
+					zap.String("id", model.ID))
 				return fmt.Errorf("failed to update metric counter: %w", err)
 			}
 		}
@@ -154,50 +134,16 @@ func (s *DBStorage) insertMetric(ctx context.Context, models []m.Metrics) error 
 	}
 	return nil
 }
+
 func (s *DBStorage) getMetricsOnDBs(ctx context.Context, metrics ...m.Metrics) ([]*m.Metrics, error) {
-	if len(metrics) == 0 {
-		return nil, nil
-	}
-
-	mTypes := make([]string, 0, len(metrics))
-	keys := make([]string, 0, len(metrics))
-	for _, metric := range metrics {
-		mTypes = append(mTypes, metric.MType)
-		keys = append(keys, metric.ID)
-	}
-
-	mTypePlaceholders := make([]string, len(mTypes))
-	keyPlaceholders := make([]string, len(keys))
-	for i := range mTypePlaceholders {
-		mTypePlaceholders[i] = fmt.Sprintf("$%d", i+1)
-	}
-	for i := range keyPlaceholders {
-		keyPlaceholders[i] = fmt.Sprintf("$%d", len(mTypePlaceholders)+i+1)
-	}
-
-	query := fmt.Sprintf(`
-        SELECT key, m_type, delta, value 
-        FROM metrics 
-        WHERE m_type IN (%s) AND key IN (%s)
-    `,
-		strings.Join(mTypePlaceholders, ","),
-		strings.Join(keyPlaceholders, ","),
-	)
-
-	args := make([]interface{}, 0, len(mTypes)+len(keys))
-	for _, v := range mTypes {
-		args = append(args, v)
-	}
-	for _, v := range keys {
-		args = append(args, v)
-	}
-
+	query, mTypes, args := CollectorQuery(ctx, metrics)
 	rows, err := s.conn.QueryContext(ctx, query, args...)
 	if err != nil {
 		s.Logger.ErrorCtx(ctx, "Failed to execute query", zap.Error(err))
 		return nil, err
 	}
 	defer rows.Close()
+
 	results := make([]*m.Metrics, 0, len(mTypes))
 	for rows.Next() {
 		metric := new(m.Metrics)
@@ -207,12 +153,8 @@ func (s *DBStorage) getMetricsOnDBs(ctx context.Context, metrics ...m.Metrics) (
 			s.Logger.ErrorCtx(ctx, "Failed to scan row", zap.Error(err))
 			continue
 		}
-		if delta.Valid {
-			metric.Delta = &delta.Int64
-		}
-		if value.Valid {
-			metric.Value = &value.Float64
-		}
+		metric.Delta = &delta.Int64
+		metric.Value = &value.Float64
 		results = append(results, metric)
 	}
 
@@ -233,34 +175,39 @@ func (s *DBStorage) SetGauge(ctx context.Context, models ...m.Metrics) ([]*m.Met
 }
 
 func (s *DBStorage) ensureMetrics(ctx context.Context, models ...m.Metrics) ([]*m.Metrics, error) {
-	if err := s.ensureMetricsTableExists(ctx); err != nil {
+	// check if table exists
+	if err := s.EnsureMetricsTableExists(ctx); err != nil {
 		s.Logger.ErrorCtx(ctx, "failed to ensure Metrics table exists", zap.Error(err))
 		return nil, err
 	}
-	res, err := s.getMetricsOnDBs(ctx, models...)
+	// filter duplicates and batches before saving
+	models = FilterBatchesBeforeSaving(models)
+
+	existingMetrics, err := s.getMetricsOnDBs(ctx, models...)
 	if err != nil {
 		return nil, err
 	}
-	if len(res) != 0 {
-		if err := s.updateMetric(ctx, models); err != nil {
+	// filter duplicates and sort before updating/inserting
+	updatingBatch, insertingBatch := SortingBatchData(existingMetrics, models)
+
+	if len(updatingBatch) != 0 {
+		if err := s.updateMetric(ctx, updatingBatch); err != nil {
 			s.Logger.ErrorCtx(ctx, "failed to update metric", zap.Error(err))
 			return nil, err
 		}
-	} else {
-		if err := s.insertMetric(ctx, models); err != nil {
+	}
+	if len(insertingBatch) != 0 {
+		if err := s.insertMetric(ctx, insertingBatch); err != nil {
 			s.Logger.ErrorCtx(ctx, "failed to insert metric", zap.Error(err))
 			return nil, err
 		}
 	}
-	res, err = s.getMetricsOnDBs(ctx, models...)
+
+	metrics, err := s.getMetricsOnDBs(ctx, models...)
 	if err != nil {
 		return nil, err
 	}
-	if len(models) < 1 {
-		s.Logger.InfoCtx(ctx, "failed to find inserted/updated metric", zap.Error(err))
-		return nil, fmt.Errorf("metric not found")
-	}
-	return res, nil
+	return metrics, nil
 }
 
 func (s *DBStorage) LoadFromFile(fname string) error {
