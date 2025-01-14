@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"database/sql"
 	"net/http"
 
 	"github.com/go-chi/chi"
@@ -11,40 +12,44 @@ import (
 )
 
 type Controller struct {
-	r         chi.Router
-	l         *l.ZapLogger
-	midleware *v.MiddlewareController
-	storage   storage.Storage
-	ms        *h.Storage
+	r          chi.Router
+	l          *l.ZapLogger
+	middleware *v.MiddlewareController
+	storage    storage.Storage
+	s          *h.Storage
 }
 
-func New(s storage.Storage, logger *l.ZapLogger) *Controller {
-	return &Controller{
-		l:         logger,
-		r:         chi.NewRouter(),
-		midleware: v.New(logger),
-		storage:   s,
-		ms:        h.NewStorage(s, logger),
+func New(s storage.Storage, db *sql.DB, logger *l.ZapLogger) *Controller {
+	c := &Controller{
+		l:       logger,
+		r:       chi.NewRouter(),
+		storage: s,
 	}
+
+	c.s = h.NewStorage(s, db, logger)
+	c.middleware = v.New(c.s, logger)
+	return c
 }
 
 func (c *Controller) InitRouting() http.Handler {
 	r := chi.NewRouter()
-	r.Use(c.midleware.Recover, v.GzipMiddleware)
+	r.Use(c.middleware.Recover, v.GzipMiddleware)
 
 	r.Route("/", func(r chi.Router) {
 		// Get routes
-		r.Get("/*", http.HandlerFunc(c.ms.MainPageHandler))
-		r.Get("/{value}/{type}/*", http.HandlerFunc(c.ms.GetMetricsByNameHandler))
+		r.Get("/*", c.middleware.CheckForPingMiddleware(http.HandlerFunc(c.s.MainPageHandler)))
+		r.Get("/ping/", http.HandlerFunc(c.s.PingDBHandler))
+		r.Get("/{value}/{type}/*", http.HandlerFunc(c.s.GetMetricsByNameHandler))
 
 		// Post routes
-		r.Post("/*", c.midleware.ValidationOld(http.HandlerFunc(h.NotImplementedHandler)))
-		r.Post("/value/*", http.HandlerFunc(c.ms.GetMetricsByValueHandler))
+		r.Post("/*", c.middleware.ValidationOld(http.HandlerFunc(h.NotImplementedHandler)))
+		r.Post("/value/*", http.HandlerFunc(c.s.GetMetricsByValueHandler))
+		r.Post("/updates/", http.HandlerFunc(c.s.MetricsHandler))
 
 		r.Route("/update", func(r chi.Router) {
-			r.Post("/*", http.HandlerFunc(c.ms.GetMetricsHandler))
-			r.Post("/gauge/*", c.midleware.ValidationOld(http.HandlerFunc(c.ms.GetMetricsHandler)))
-			r.Post("/counter/*", c.midleware.ValidationOld(http.HandlerFunc(c.ms.GetMetricsHandler)))
+			r.Post("/*", http.HandlerFunc(c.s.MetricHandler))
+			r.Post("/gauge/*", c.middleware.ValidationOld(http.HandlerFunc(c.s.MetricHandler)))
+			r.Post("/counter/*", c.middleware.ValidationOld(http.HandlerFunc(c.s.MetricHandler)))
 		})
 	})
 

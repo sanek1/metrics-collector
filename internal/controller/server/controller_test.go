@@ -40,7 +40,8 @@ func TestController_PeriodicallySaveBackUp(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	ctrl := New(storage.NewMetricsStorage(logger), logger)
+
+	ctrl := New(storage.NewMetricsStorage(logger), storage.NewMetricsStorage(logger), nil, logger)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -50,8 +51,8 @@ func TestController_PeriodicallySaveBackUp(t *testing.T) {
 			// send metrics to server
 			var v = 11.0
 			metric := m.NewMetricGauge("test_gauge", &v)
-			ok := ctrl.storage.SetGauge(ctx, *metric)
-			if !ok {
+			_, err := ctrl.storage.SetGauge(ctx, *metric)
+			if err != nil {
 				t.Error("Failed to set gauge in memory storage")
 			}
 			// create a new file
@@ -61,7 +62,7 @@ func TestController_PeriodicallySaveBackUp(t *testing.T) {
 			//file save successful
 			time.Sleep(15 * time.Second)
 			// check file exists
-			if err := ctrl.storage.LoadFromFile(tt.args.filename); err != nil {
+			if err := ctrl.fieStorage.LoadFromFile(tt.args.filename); err != nil {
 				t.Errorf("Error loading metrics from file: %v", err)
 			}
 

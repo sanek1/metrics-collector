@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"time"
 
@@ -12,21 +13,24 @@ import (
 )
 
 type Controller struct {
-	storage storage.Storage
-	router  http.Handler
-	logger  *l.ZapLogger
+	storage    storage.MetricStorage
+	fieStorage storage.FileStorage
+	router     http.Handler
+	logger     *l.ZapLogger
 }
 
-func New(s storage.Storage, logger *l.ZapLogger) *Controller {
-	r := routing.New(s, logger)
+func New(fs storage.FileStorage, s storage.MetricStorage, conn *sql.DB, logger *l.ZapLogger) *Controller {
+	r := routing.New(s, conn, logger)
 	return &Controller{
-		storage: s,
-		router:  r.InitRouting(),
-		logger:  logger,
+		storage:    s,
+		fieStorage: fs,
+		router:     r.InitRouting(),
+		logger:     logger,
 	}
 }
 
 func (c *Controller) Router() http.Handler {
+	c.logger.InfoCtx(context.Background(), "init router")
 	return c.router
 }
 

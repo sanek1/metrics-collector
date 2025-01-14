@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	con "context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,36 +20,86 @@ import (
 
 type Services struct {
 	s      storage.Storage
-	model  *m.Metrics
+	models *[]m.Metrics
 	logger *l.ZapLogger
+	db     *sql.DB
 }
 
-func NewHandlerServices(st storage.Storage, model *m.Metrics, zl *l.ZapLogger) *Services {
+type SetGaugeInterface interface {
+	SetGauge(con.Context, m.Metrics) (*m.Metrics, error)
+}
+
+type MetricsServiceInterface interface {
+	MetricsService(con.Context, http.ResponseWriter, []*m.Metrics)
+}
+
+func NewHandlerServices(st storage.Storage,
+	db *sql.DB,
+	models *[]m.Metrics,
+	zl *l.ZapLogger) *Services {
 	return &Services{
 		s:      st,
-		model:  model,
+		models: models,
 		logger: zl,
+		db:     db,
 	}
+}
+
+func (s *Services) PingService(ctx con.Context, rw http.ResponseWriter) {
+	if s.db == nil {
+		s.logger.ErrorCtx(ctx, "Database is nil")
+		SendResultStatusNotOK(rw, nil)
+		return
+	}
+	if err := s.db.PingContext(ctx); err != nil {
+		s.logger.ErrorCtx(ctx, "Database is not available", zap.Error(err))
+		SendResultStatusNotOK(rw, nil)
+		return
+	}
+	SendResultStatusOK(rw, nil)
 }
 
 func (s *Services) CounterService(ctx con.Context, rw http.ResponseWriter) {
-	model := s.s.SetCounter(ctx, *s.model)
-	resp, err := json.Marshal(model)
+	models := *s.models
+	updatedModels, err := s.s.SetCounter(ctx, models...)
 	if err != nil {
-		s.logger.ErrorCtx(ctx, "The metric was not parsed", zap.Any("err", err.Error()))
+		s.logger.ErrorCtx(ctx, "The metric counter was not saved", zap.Any("err", err.Error()))
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	SendResultStatusOK(rw, resp)
+	s.MetricsService(ctx, rw, updatedModels...)
 }
 
 func (s *Services) GaugeService(ctx con.Context, rw http.ResponseWriter) {
-	if ok := s.s.SetGauge(ctx, *s.model); !ok {
-		s.logger.ErrorCtx(ctx, "The metric was not saved", zap.Any("err", "no such value exists"))
-		http.Error(rw, "No such value exists", http.StatusNotFound)
+	models := *s.models
+	updatedModels, err := s.s.SetGauge(ctx, models...)
+	if err != nil {
+		s.logger.ErrorCtx(ctx, "One or more metrics were not saved", zap.Any("err", err.Error()))
+		http.Error(rw, "One or more metrics were not saved", http.StatusInternalServerError)
 		return
 	}
-	resp, err := json.Marshal(s.model)
+	if len(updatedModels) == 1 {
+		res := updatedModels[0]
+		s.MetricsService(ctx, rw, res)
+		return
+	}
+	s.MetricsService(ctx, rw, updatedModels...)
+}
+
+func (s *Services) MetricsService(ctx con.Context, rw http.ResponseWriter, models ...*m.Metrics) {
+	if len(models) == 1 {
+		model := models[0]
+		resp, err := json.Marshal(model)
+		if err != nil {
+			s.logger.ErrorCtx(ctx, "The metric was not marshaled", zap.Any("err", err.Error()))
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		SendResultStatusOK(rw, resp)
+		return
+	}
+
+	resp, err := json.Marshal(models)
 	if err != nil {
 		s.logger.ErrorCtx(ctx, "The metric was not marshaled", zap.Any("err", err.Error()))
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -57,32 +108,43 @@ func (s *Services) GaugeService(ctx con.Context, rw http.ResponseWriter) {
 	SendResultStatusOK(rw, resp)
 }
 
-func ParseMetricServices(rw http.ResponseWriter, r *http.Request) (m.Metrics, error) {
-	var model m.Metrics
+func (s *Services) ParseMetricsServices(rw http.ResponseWriter, r *http.Request) ([]m.Metrics, error) {
+	var models []m.Metrics
 	if r.ContentLength == 0 {
-		if err := buildJSONBody(rw, r); err != nil {
-			err = fmt.Errorf("buildJSONBody")
-			fmt.Println("buildJSONBody")
-			return model, err
+		if err := s.buildJSONBody(rw, r); err != nil {
+			s.logger.ErrorCtx(r.Context(), "The metric was not parsed", zap.Any("err", err.Error()))
+			return nil, fmt.Errorf("buildJSONBody: %w", err)
+		}
+	}
+
+	//todo: check r.Body array or single json string
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		s.logger.ErrorCtx(r.Context(), "The metric was not read", zap.Any("err", err.Error()))
+		return nil, fmt.Errorf("read body: %w", err)
+	}
+
+	var model m.Metrics
+	if err := json.Unmarshal(bodyBytes, &model); err != nil {
+		s.logger.InfoCtx(r.Context(), "The metric was not parsed", zap.Any("err", err.Error()))
+		if err := json.Unmarshal(bodyBytes, &models); err != nil {
+			s.logger.ErrorCtx(r.Context(), "The metric was not parsed", zap.Any("err", err.Error()))
+			return nil, fmt.Errorf("unmarshal: %w", err)
 		}
 	}
 	defer r.Body.Close()
 
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&model); err != nil {
-		http.Error(rw, err.Error(), http.StatusBadRequest)
-		err = fmt.Errorf("buildJSONBody2: decoding")
-		fmt.Println("buildJSONBody2")
-		return model, err
+	if model != (m.Metrics{}) {
+		models = append(models, model)
 	}
 
-	if model.MType == m.TypeGauge || model.MType == m.TypeCounter {
-		return model, nil
-	} else {
-		rw.WriteHeader(http.StatusBadRequest)
-		fmt.Println("unsupported request type")
-		return model, fmt.Errorf("unsupported request type")
+	for _, model := range models {
+		if model.MType != m.TypeGauge && model.MType != m.TypeCounter {
+			s.logger.ErrorCtx(r.Context(), "The metric has unsupported type", zap.Any("err", "unsupported request type"))
+			return nil, fmt.Errorf("unsupported request type: %s", model.MType)
+		}
 	}
+	return models, nil
 }
 
 func GenerateHTMLServices(metrics []string) string {
@@ -114,10 +176,9 @@ func SendResultStatusNotOK(rw http.ResponseWriter, resp []byte) {
 	}
 }
 
-func buildJSONBody(rw http.ResponseWriter, r *http.Request) (err error) {
+func (s *Services) buildJSONBody(rw http.ResponseWriter, r *http.Request) (err error) {
 	key, name, val, err := readingDataFromURL(r)
 	if err != nil {
-		fmt.Println("url parsing")
 		http.Error(rw, "The value does not match the expected type.", http.StatusBadRequest)
 		return err
 	}
@@ -128,13 +189,13 @@ func buildJSONBody(rw http.ResponseWriter, r *http.Request) (err error) {
 		Delta: &intVal,
 		Value: val,
 	}
-	resp, err := json.Marshal(model)
+	models := []m.Metrics{model}
+	resp, err := json.Marshal(models)
 	if err != nil {
 		fmt.Println("marshaling error")
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return err
 	}
-	// set body
 	r.Body = io.NopCloser(bytes.NewReader(resp))
 	return nil
 }

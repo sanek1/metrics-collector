@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
 
 	"github.com/sanek1/metrics-collector/internal/config"
 	m "github.com/sanek1/metrics-collector/internal/models"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
-	"go.uber.org/zap"
 )
 
 const (
@@ -18,8 +18,10 @@ const (
 )
 
 type MetricsStorage struct {
+	mtx     sync.RWMutex
 	Metrics map[string]m.Metrics
 	Logger  *l.ZapLogger
+	Errors  []string
 }
 
 func NewMetricsStorage(logger *l.ZapLogger) *MetricsStorage {
@@ -49,7 +51,7 @@ func (ms *MetricsStorage) GetAllMetrics() []string {
 	return result
 }
 
-func (ms *MetricsStorage) GetMetrics(key, metricName string) (*m.Metrics, bool) {
+func (ms *MetricsStorage) GetMetrics(ctx context.Context, key, metricName string) (*m.Metrics, bool) {
 	metric, ok := ms.Metrics[metricName]
 	if !ok {
 		return nil, false
@@ -57,31 +59,72 @@ func (ms *MetricsStorage) GetMetrics(key, metricName string) (*m.Metrics, bool) 
 	return &metric, true
 }
 
-func (ms *MetricsStorage) SetCounter(ctx context.Context, model m.Metrics) m.Metrics {
-	setLog(ctx, ms, &model, "SetCounter")
-	if metric, ok := ms.Metrics[model.ID]; ok {
-		*metric.Delta += *model.Delta
+func (ms *MetricsStorage) SetCounter(ctx context.Context, models ...m.Metrics) ([]*m.Metrics, error) {
+	ms.mtx.Lock()
+	defer ms.mtx.Unlock()
+
+	results := make([]*m.Metrics, len(models))
+	errors := make([]error, len(models))
+
+	for i, model := range models {
+		SetLog(ctx, ms, &model, "SetCounter")
+		metric, exists := ms.Metrics[model.ID]
+		if exists && metric.Delta != nil {
+			*metric.Delta += *model.Delta
+		} else {
+			metric = m.Metrics{
+				ID:    model.ID,
+				MType: model.MType,
+				Delta: model.Delta,
+			}
+		}
 		ms.Metrics[model.ID] = metric
-	} else {
-		ms.Metrics[model.ID] = m.Metrics{
-			ID:    model.ID,
-			MType: model.MType,
-			Delta: model.Delta,
+		results[i] = &metric
+	}
+
+	hasErrors := false
+	for _, err := range errors {
+		if err != nil {
+			hasErrors = true
+			break
 		}
 	}
-	return ms.Metrics[model.ID]
+
+	if hasErrors {
+		return results, fmt.Errorf("errors: %v", errors)
+	}
+
+	return results, nil
 }
 
-func (ms *MetricsStorage) SetGauge(ctx context.Context, model m.Metrics) bool {
-	setLog(ctx, ms, &model, "SetGauge")
-	ms.Metrics[model.ID] = m.Metrics{ID: model.ID, MType: model.MType, Value: model.Value}
-	return true
-}
+func (ms *MetricsStorage) SetGauge(ctx context.Context, models ...m.Metrics) ([]*m.Metrics, error) {
+	ms.mtx.Lock()
+	defer ms.mtx.Unlock()
 
-func setLog(ctx context.Context, ms *MetricsStorage, model *m.Metrics, name string) {
-	ms.Logger.InfoCtx(ctx, name, zap.String(name, fmt.Sprintf("model%s", formatMetric(*model))))
-}
+	results := make([]*m.Metrics, len(models))
+	errors := make([]error, len(models))
 
+	for i, model := range models {
+		SetLog(ctx, ms, &model, "SetGauge")
+		ms.Metrics[model.ID] = m.Metrics{ID: model.ID, MType: model.MType, Value: model.Value}
+		res := ms.Metrics[model.ID]
+		results[i] = &res
+		errors[i] = nil
+	}
+
+	hasErrors := false
+	for _, err := range errors {
+		if err != nil {
+			hasErrors = true
+			break
+		}
+	}
+
+	if hasErrors {
+		return results, fmt.Errorf("errors: %v", errors)
+	}
+	return results, nil
+}
 func (ms *MetricsStorage) SaveToFile(fname string) error {
 	// serialize to json
 	data, err := json.MarshalIndent(ms.Metrics, "", "   ")
