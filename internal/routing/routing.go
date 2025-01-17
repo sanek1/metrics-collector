@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"database/sql"
 	"net/http"
 
 	"github.com/go-chi/chi"
@@ -19,14 +18,14 @@ type Controller struct {
 	s          *h.Storage
 }
 
-func New(s storage.Storage, db *sql.DB, logger *l.ZapLogger) *Controller {
+func New(s storage.Storage, logger *l.ZapLogger) *Controller {
 	c := &Controller{
 		l:       logger,
 		r:       chi.NewRouter(),
 		storage: s,
 	}
 
-	c.s = h.NewStorage(s, db, logger)
+	c.s = h.NewStorage(s, logger)
 	c.middleware = v.New(c.s, logger)
 	return c
 }

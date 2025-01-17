@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/sanek1/metrics-collector/internal/config"
 	m "github.com/sanek1/metrics-collector/internal/models"
@@ -162,4 +163,38 @@ func (ms *MetricsStorage) LoadFromFile(filename string) error {
 func formatMetric(model m.Metrics) string {
 	data, _ := json.Marshal(model) //
 	return string(data)
+}
+
+func (ms *MetricsStorage) PeriodicallySaveBackUp(ctx context.Context, filename string, restore bool, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	if restore {
+		err := ms.LoadFromFile(filename)
+		if err != nil {
+			ms.Logger.ErrorCtx(ctx, "Error loading metrics from file")
+		}
+	}
+
+	for range ticker.C {
+		err := ms.SaveToFile(filename)
+		ms.Logger.InfoCtx(ctx, "saving to file was successful")
+		if err != nil {
+			ms.Logger.ErrorCtx(ctx, "Error saving metrics to file"+err.Error())
+		}
+	}
+
+	for {
+		select {
+		case <-ticker.C:
+			err := ms.SaveToFile(filename)
+			ms.Logger.InfoCtx(ctx, "saving to file was successful")
+			if err != nil {
+				ms.Logger.ErrorCtx(ctx, "Error saving metrics to file"+err.Error())
+			}
+
+		case <-ctx.Done():
+			ms.Logger.InfoCtx(ctx, "Backup process stopped.")
+			return
+		}
+	}
 }

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -22,13 +21,12 @@ const (
 type Storage struct {
 	Storage         storage.Storage
 	Logger          *l.ZapLogger
-	db              *sql.DB
 	handlerServices *Services
 }
 
-func NewStorage(s storage.Storage, db *sql.DB, zl *l.ZapLogger) *Storage {
-	hs := NewHandlerServices(s, db, nil, zl)
-	return &Storage{Storage: s, Logger: zl, db: db, handlerServices: hs}
+func NewStorage(s storage.Storage, zl *l.ZapLogger) *Storage {
+	hs := NewHandlerServices(s, nil, zl)
+	return &Storage{Storage: s, Logger: zl, handlerServices: hs}
 }
 
 func (s Storage) MainPageHandler(rw http.ResponseWriter, r *http.Request) {
