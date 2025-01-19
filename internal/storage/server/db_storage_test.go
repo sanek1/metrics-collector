@@ -18,7 +18,10 @@ func TestInsertUpdateMultipleMetricsInBatch(t *testing.T) {
 	value3 := int64(1)
 
 	ctx := context.Background()
-	opt := &flags.ServerOptions{DBPath: "host=localhost port=5432 user=postgres password=admin dbname=MetricStore sslmode=disable"}
+	opt := flags.ParseServerFlags()
+	if opt.DBPath == "" {
+		return
+	}
 	logger, _ := l.NewZapLogger(zap.InfoLevel)
 
 	storage := NewDBStorage(opt, logger)
