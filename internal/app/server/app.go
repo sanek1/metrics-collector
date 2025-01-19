@@ -29,16 +29,13 @@ func New(opt *flags.ServerOptions, useDatabase bool) *App {
 	if err != nil {
 		panic(err)
 	}
-	//l := startLogger()
 	s := storage.GetStorage(useDatabase, opt, logger)
 	if useDatabase {
 		if _, ok := s.(*storage.DBStorage); !ok {
 			logger.InfoCtx(context.Background(), opt.DBPath, zap.Error(err))
 			logger.ErrorCtx(context.Background(), "Error connecting to database", zap.Error(err))
 		}
-
 	}
-
 	fs := storage.NewMetricsStorage(logger)
 	ctrl := c.NewController(fs, s, logger)
 
@@ -69,26 +66,9 @@ func (a *App) Run() error {
 		go fs.PeriodicallySaveBackUp(ctx, a.path, a.restore, time.Duration(a.storeInterval)*time.Second)
 	}
 	if dbs, ok := a.storage.(storage.DatabaseStorage); ok {
-		// check if table exists
 		if err := dbs.EnsureMetricsTableExists(ctx); err != nil {
 			a.logger.ErrorCtx(ctx, "failed to ensure Metrics table exists", zap.Error(err))
 		}
 	}
-
 	return server.ListenAndServe()
 }
-
-// func startLogger() *logging.ZapLogger {
-// 	ctx := context.Background()
-// 	l, err := logging.NewZapLogger(zap.InfoLevel)
-
-// 	if err != nil {
-// 		log.Panic(err)
-// 	}
-
-// 	_ = l.WithContextFields(ctx,
-// 		zap.String("app", "logging"))
-
-// 	defer l.Sync()
-// 	return l
-// }

@@ -43,7 +43,7 @@ func (c *Controller) InitRouting() http.Handler {
 		// Post routes
 		r.Post("/*", c.middleware.ValidationOld(http.HandlerFunc(h.NotImplementedHandler)))
 		r.Post("/value/*", http.HandlerFunc(c.s.GetMetricsByValueHandler))
-		r.Post("/updates/", http.HandlerFunc(c.s.MetricsHandler))
+		r.Post("/updates/", http.HandlerFunc(c.s.MetricHandler))
 
 		r.Route("/update", func(r chi.Router) {
 			r.Post("/*", http.HandlerFunc(c.s.MetricHandler))

@@ -15,12 +15,12 @@ type Storage interface {
 }
 
 type DatabaseStorage interface {
-	PingIsOk() bool
-	EnsureMetricsTableExists(ctx context.Context) error
+	PingIsOk() bool                                     // check if the database is ok
+	EnsureMetricsTableExists(ctx context.Context) error // Ensure the table exists
 }
 
 type FileStorage interface {
-	SaveToFile(fname string) error   // Save the metric to a file
-	LoadFromFile(fname string) error // Save the metric to a file
-	PeriodicallySaveBackUp(ctx context.Context, filename string, restore bool, interval time.Duration)
+	SaveToFile(fname string) error                                                                     // Save the metric to a file
+	LoadFromFile(fname string) error                                                                   // Save the metric to a file
+	PeriodicallySaveBackUp(ctx context.Context, filename string, restore bool, interval time.Duration) // Save the metric to file
 }
