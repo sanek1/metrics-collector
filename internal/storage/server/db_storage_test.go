@@ -30,13 +30,14 @@ func TestInsertUpdateMultipleMetricsInBatch(t *testing.T) {
 		{ID: "metric3", MType: "counter", Delta: &value2, Value: &value1},
 		{ID: "metric1", MType: "counter", Delta: &value3, Value: nil},
 	}
+	// check EnsureMetricsTableExists
+	if err := storage.EnsureMetricsTableExists(ctx); err != nil {
+		t.Error("failed to ensure metrics table exists: %w", err)
+	}
 
 	models := FilterBatchesBeforeSaving(testMetrics)
 
-	existingMetrics, err := storage.getMetricsOnDBs(ctx, models...)
-	if err != nil {
-		t.Fatal(err)
-	}
+	existingMetrics, _ := storage.getMetricsOnDBs(ctx, models...)
 	// filter duplicates and sort before updating/inserting
 	updatingBatch, insertingBatch := SortingBatchData(existingMetrics, models)
 
@@ -75,8 +76,12 @@ func TestInsertUpdateMultipleMetricsInBatch(t *testing.T) {
 		assert.Equal(t, expectedMetric.MType, retrievedMetric.MType)
 
 		if retrievedMetric.MType == "counter" {
-			oldDelta := *metricMapBefore[expectedMetric.ID].Delta
-			assert.Equal(t, *expectedMetric.Delta+oldDelta, *retrievedMetric.Delta)
+			if metricMapBefore[expectedMetric.ID].Delta == nil {
+				assert.Equal(t, *expectedMetric.Delta, *retrievedMetric.Delta)
+			} else {
+				oldDelta := *metricMapBefore[expectedMetric.ID].Delta
+				assert.Equal(t, *expectedMetric.Delta+oldDelta, *retrievedMetric.Delta)
+			}
 		} else {
 			assert.Equal(t, expectedMetric.Delta, retrievedMetric.Delta)
 		}

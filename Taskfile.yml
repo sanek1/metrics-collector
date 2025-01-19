@@ -79,7 +79,7 @@ tasks:
   test:
       deps: [build]
       cmds:
-       # - go test -cover ./... > logs/cover.log
+        #- go test -cover ./... > logs/cover.log
         - metricstest -test.v -test.run=^TestIteration1$ -binary-path=cmd/server/server >> logs/test1.log
         - metricstest -test.v -test.run=^TestIteration2[AB]*$ -source-path=. -agent-binary-path=cmd/agent/agent >> logs/test2.log
         - metricstest -test.v -test.run=^TestIteration3[AB]*$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server >> logs/test3.log
