@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"database/sql"
 	"net/http"
 
 	"github.com/go-chi/chi"
@@ -19,14 +18,14 @@ type Controller struct {
 	s          *h.Storage
 }
 
-func New(s storage.Storage, db *sql.DB, logger *l.ZapLogger) *Controller {
+func New(s storage.Storage, logger *l.ZapLogger) *Controller {
 	c := &Controller{
 		l:       logger,
 		r:       chi.NewRouter(),
 		storage: s,
 	}
 
-	c.s = h.NewStorage(s, db, logger)
+	c.s = h.NewStorage(s, logger)
 	c.middleware = v.New(c.s, logger)
 	return c
 }
@@ -44,7 +43,7 @@ func (c *Controller) InitRouting() http.Handler {
 		// Post routes
 		r.Post("/*", c.middleware.ValidationOld(http.HandlerFunc(h.NotImplementedHandler)))
 		r.Post("/value/*", http.HandlerFunc(c.s.GetMetricsByValueHandler))
-		r.Post("/updates/", http.HandlerFunc(c.s.MetricsHandler))
+		r.Post("/updates/", http.HandlerFunc(c.s.MetricHandler))
 
 		r.Route("/update", func(r chi.Router) {
 			r.Post("/*", http.HandlerFunc(c.s.MetricHandler))

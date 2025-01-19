@@ -2,8 +2,6 @@ package app
 
 import (
 	"context"
-	"database/sql"
-	"log"
 	"net/http"
 	"time"
 
@@ -22,7 +20,7 @@ type App struct {
 	path          string
 	restore       bool
 	logger        *logging.ZapLogger
-	store         storage.MetricStorage
+	storage       storage.Storage
 }
 
 func New(opt *flags.ServerOptions, useDatabase bool) *App {
@@ -31,20 +29,15 @@ func New(opt *flags.ServerOptions, useDatabase bool) *App {
 	if err != nil {
 		panic(err)
 	}
-	l := startLogger()
-	// init db connection
-	var conn *sql.DB
+	s := storage.GetStorage(useDatabase, opt, logger)
 	if useDatabase {
-		conn, err = startDB(opt)
-		if err != nil {
+		if _, ok := s.(*storage.DBStorage); !ok {
 			logger.InfoCtx(context.Background(), opt.DBPath, zap.Error(err))
 			logger.ErrorCtx(context.Background(), "Error connecting to database", zap.Error(err))
 		}
 	}
-
-	fs := storage.NewMetricsStorage(l)
-	s := storage.GetStorage(useDatabase, conn, l)
-	ctrl := c.New(fs, s, conn, l)
+	fs := storage.NewMetricsStorage(logger)
+	ctrl := c.NewController(fs, s, logger)
 
 	return &App{
 		controller:    ctrl,
@@ -53,40 +46,8 @@ func New(opt *flags.ServerOptions, useDatabase bool) *App {
 		path:          opt.Path,
 		restore:       opt.Restore,
 		logger:        logger,
-		store:         s,
+		storage:       s,
 	}
-}
-
-func startDB(opt *flags.ServerOptions) (*sql.DB, error) {
-	db, err := sql.Open("pgx", opt.DBPath)
-
-	if err != nil {
-		return nil, err
-	}
-	err = db.Ping()
-	if err != nil {
-		return nil, err
-	}
-	err = db.PingContext(context.Background())
-	if err != nil {
-		return nil, err
-	}
-	return db, nil
-}
-
-func startLogger() *logging.ZapLogger {
-	ctx := context.Background()
-	l, err := logging.NewZapLogger(zap.InfoLevel)
-
-	if err != nil {
-		log.Panic(err)
-	}
-
-	_ = l.WithContextFields(ctx,
-		zap.String("app", "logging"))
-
-	defer l.Sync()
-	return l
 }
 
 func (a *App) Run() error {
@@ -100,6 +61,14 @@ func (a *App) Run() error {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	a.logger.InfoCtx(ctx, "Running server", zap.String("address%s", a.addr))
-	go a.controller.PeriodicallySaveBackUp(ctx, a.path, a.restore, time.Duration(a.storeInterval)*time.Second)
+
+	if fs, ok := a.storage.(storage.FileStorage); ok {
+		go fs.PeriodicallySaveBackUp(ctx, a.path, a.restore, time.Duration(a.storeInterval)*time.Second)
+	}
+	if dbs, ok := a.storage.(storage.DatabaseStorage); ok {
+		if err := dbs.EnsureMetricsTableExists(ctx); err != nil {
+			a.logger.ErrorCtx(ctx, "failed to ensure Metrics table exists", zap.Error(err))
+		}
+	}
 	return server.ListenAndServe()
 }

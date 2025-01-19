@@ -41,7 +41,7 @@ func TestController_PeriodicallySaveBackUp(t *testing.T) {
 		panic(err)
 	}
 
-	ctrl := New(storage.NewMetricsStorage(logger), storage.NewMetricsStorage(logger), nil, logger)
+	ctrl := NewController(storage.NewMetricsStorage(logger), storage.NewMetricsStorage(logger), logger)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -56,7 +56,7 @@ func TestController_PeriodicallySaveBackUp(t *testing.T) {
 				t.Error("Failed to set gauge in memory storage")
 			}
 			// create a new file
-			go ctrl.PeriodicallySaveBackUp(ctx, tt.args.filename, tt.args.restore, tt.args.interval)
+			go ctrl.fieStorage.PeriodicallySaveBackUp(ctx, tt.args.filename, tt.args.restore, tt.args.interval)
 			<-ctx.Done()
 
 			//file save successful

@@ -44,22 +44,6 @@ func TestGetMetricsByBody(t *testing.T) {
 			},
 			expectedStatus: http.StatusOK,
 		},
-		// {
-		// 	name: "counter",
-		// 	model: []m.Metrics{
-		// 		{
-		// 			ID:    "test1",
-		// 			MType: "counter",
-		// 			Value: &value1,
-		// 		},
-		// 		{
-		// 			ID:    "test2",
-		// 			MType: "gauge",
-		// 			Delta: &value2,
-		// 		},
-		// 	},
-		// 	expectedStatus: http.StatusOK,
-		// },
 	}
 
 	ctx := context.Background()
@@ -68,7 +52,55 @@ func TestGetMetricsByBody(t *testing.T) {
 		log.Panic(err)
 	}
 	s := storage.GetStorage(false, nil, l)
-	memStorage := NewStorage(s, nil, l)
+	memStorage := NewStorage(s, l)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			b, _ := json.Marshal(test.model)
+			req, err := http.NewRequestWithContext(ctx, "POST", "/", bytes.NewBuffer(b))
+			require.NoError(t, err)
+			w := httptest.NewRecorder()
+			memStorage.MetricHandler(w, req)
+
+			assert.Equal(t, test.expectedStatus, w.Code)
+		})
+	}
+}
+
+func TestBatchMetricsByBody(t *testing.T) {
+	value1 := float64(123)
+	value2 := int64(-123)
+
+	tests := []struct {
+		name           string
+		model          []m.Metrics
+		expectedStatus int
+	}{
+		{
+			name: "counter",
+			model: []m.Metrics{
+				{
+					ID:    "test1",
+					MType: "counter",
+					Value: &value1,
+				},
+				{
+					ID:    "test2",
+					MType: "gauge",
+					Delta: &value2,
+				},
+			},
+			expectedStatus: http.StatusOK,
+		},
+	}
+
+	ctx := context.Background()
+	l, err := l.NewZapLogger(zap.InfoLevel)
+	if err != nil {
+		log.Panic(err)
+	}
+	s := storage.GetStorage(false, nil, l)
+	memStorage := NewStorage(s, l)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

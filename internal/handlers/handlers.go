@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -22,13 +21,12 @@ const (
 type Storage struct {
 	Storage         storage.Storage
 	Logger          *l.ZapLogger
-	db              *sql.DB
 	handlerServices *Services
 }
 
-func NewStorage(s storage.Storage, db *sql.DB, zl *l.ZapLogger) *Storage {
-	hs := NewHandlerServices(s, db, nil, zl)
-	return &Storage{Storage: s, Logger: zl, db: db, handlerServices: hs}
+func NewStorage(s storage.Storage, zl *l.ZapLogger) *Storage {
+	hs := NewHandlerServices(s, nil, zl)
+	return &Storage{Storage: s, Logger: zl, handlerServices: hs}
 }
 
 func (s Storage) MainPageHandler(rw http.ResponseWriter, r *http.Request) {
@@ -68,12 +66,11 @@ func (s Storage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.Request
 func (s Storage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 	models, err := s.handlerServices.ParseMetricsServices(rw, r)
-	model := &models[0]
-
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
+	model := &models[0]
 	if m, ok := s.Storage.GetMetrics(r.Context(), model.MType, model.ID); ok {
 		resp, err := json.Marshal(m)
 		if err != nil {
@@ -83,31 +80,11 @@ func (s Storage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http.Reques
 		SendResultStatusOK(rw, resp)
 		return
 	} else {
-		s.Logger.InfoCtx(r.Context(), "No such value exists id: "+model.ID)
 		http.Error(rw, "No such value exists", http.StatusNotFound)
 		return
 	}
 }
 
-func (s Storage) MetricsHandler(rw http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
-
-	models, err := s.handlerServices.ParseMetricsServices(rw, r)
-	if err != nil {
-		s.Logger.ErrorCtx(ctx, "The metric was not parsed", zap.Any("err", err.Error()))
-		SendResultStatusNotOK(rw, []byte(`{"error": "failed to read body"}`))
-		return
-	}
-	if len(models) <= 0 {
-		s.Logger.InfoCtx(ctx, "No such value exists")
-		http.Error(rw, "No such value exists", http.StatusNotFound)
-		return
-	}
-	s.handlerServices.models = &models
-	s.handlerServices.GaugeService(ctx, rw)
-}
-
-// ПЕРЕПИСАТЬ
 func (s Storage) MetricHandler(rw http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	models, err := s.handlerServices.ParseMetricsServices(rw, r)
@@ -132,12 +109,10 @@ func (s Storage) MetricHandler(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (s Storage) SaveToFile(fname string) error {
-	// serialize to json
 	data, err := json.MarshalIndent(s.Storage, "", "   ")
 	if err != nil {
 		return err
 	}
-	// save to file
 	return os.WriteFile(fname, data, fileMode)
 }
 

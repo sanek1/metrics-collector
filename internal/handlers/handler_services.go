@@ -3,7 +3,6 @@ package handlers
 import (
 	"bytes"
 	con "context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,39 +21,22 @@ type Services struct {
 	s      storage.Storage
 	models *[]m.Metrics
 	logger *l.ZapLogger
-	db     *sql.DB
 }
 
-type SetGaugeInterface interface {
-	SetGauge(con.Context, m.Metrics) (*m.Metrics, error)
-}
-
-type MetricsServiceInterface interface {
-	MetricsService(con.Context, http.ResponseWriter, []*m.Metrics)
-}
-
-func NewHandlerServices(st storage.Storage,
-	db *sql.DB,
-	models *[]m.Metrics,
-	zl *l.ZapLogger) *Services {
+func NewHandlerServices(st storage.Storage, models *[]m.Metrics, zl *l.ZapLogger) *Services {
 	return &Services{
 		s:      st,
 		models: models,
 		logger: zl,
-		db:     db,
 	}
 }
 
 func (s *Services) PingService(ctx con.Context, rw http.ResponseWriter) {
-	if s.db == nil {
-		s.logger.ErrorCtx(ctx, "Database is nil")
-		SendResultStatusNotOK(rw, nil)
-		return
-	}
-	if err := s.db.PingContext(ctx); err != nil {
-		s.logger.ErrorCtx(ctx, "Database is not available", zap.Error(err))
-		SendResultStatusNotOK(rw, nil)
-		return
+	if dbs, ok := s.s.(storage.DatabaseStorage); ok {
+		if !dbs.PingIsOk() {
+			SendResultStatusNotOK(rw, nil)
+			return
+		}
 	}
 	SendResultStatusOK(rw, nil)
 }
@@ -117,7 +99,6 @@ func (s *Services) ParseMetricsServices(rw http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	//todo: check r.Body array or single json string
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		s.logger.ErrorCtx(r.Context(), "The metric was not read", zap.Any("err", err.Error()))
