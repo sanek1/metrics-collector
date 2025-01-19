@@ -1,6 +1,6 @@
 module github.com/sanek1/metrics-collector
 
-go 1.23.3
+go 1.22.9
 
 toolchain go1.23.5
 
