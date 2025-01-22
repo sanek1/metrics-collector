@@ -12,24 +12,41 @@ type ServerOptions struct {
 	StoreInterval int64
 	Path          string
 	Restore       bool
+	DBPath        string
+	UseDatabase   bool
+}
+
+type DBSettings struct {
+	Host     string
+	Port     string
+	User     string
+	Password string
+	Database string
+	SSLMode  string
 }
 
 const (
 	defaultStoreInterval = 60
 	defaultFileName      = "File_Log_Store.json"
 	defaultRestore       = true
+	defaultDatabase      = "MetricStore"
+	defaultHost          = "localhost"
+	defaultPort          = "5432"
+	defaultUser          = "postgres"
+	defaultPassword      = "admin"
+	defaultSSLMode       = "disable"
 )
 
 func ParseServerFlags() *ServerOptions {
 	opt := &ServerOptions{}
+	defaultPathDB := "" // initDefaulthPathDB()
 	flag.StringVar(&opt.FlagRunAddr, "a", ":8080", "address and port to run server")
-
 	flag.Int64Var(&opt.StoreInterval, "i", defaultStoreInterval, "address and port to run server")
 	flag.StringVar(&opt.Path, "f", defaultFileName, "address and port to run server")
 	flag.BoolVar(&opt.Restore, "r", defaultRestore, "address and port to run server")
+	flag.StringVar(&opt.DBPath, "d", defaultPathDB, "address and port to run server")
 
 	flag.Parse()
-
 	if len(flag.Args()) > 0 {
 		fmt.Fprintln(os.Stderr, "Unknown flags:", flag.Args())
 		os.Exit(1)
@@ -50,5 +67,21 @@ func ParseServerFlags() *ServerOptions {
 	if restore, err := strconv.ParseBool(os.Getenv("RESTORE")); err == nil {
 		opt.Restore = restore
 	}
+
+	if dbPath := os.Getenv("DATABASE_DSN"); dbPath != "" {
+		opt.DBPath = dbPath
+	}
+
+	if opt.DBPath != "" {
+		opt.UseDatabase = true
+	} else {
+		opt.UseDatabase = false
+	}
+
 	return opt
+}
+
+func initDefaulthPathDB() string {
+	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		defaultHost, defaultPort, defaultUser, defaultPassword, defaultDatabase, defaultSSLMode)
 }

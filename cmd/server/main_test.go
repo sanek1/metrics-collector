@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	h "github.com/sanek1/metrics-collector/internal/handlers"
-	s "github.com/sanek1/metrics-collector/internal/storage/server"
+	storage "github.com/sanek1/metrics-collector/internal/storage/server"
 	v "github.com/sanek1/metrics-collector/internal/validation"
 	"github.com/sanek1/metrics-collector/pkg/logging"
 	"github.com/stretchr/testify/require"
@@ -26,18 +26,14 @@ type testTable struct {
 
 func TestRouter(t *testing.T) {
 	l, err := logging.NewZapLogger(zap.InfoLevel)
-
 	if err != nil {
 		log.Panic(err)
 	}
-	memStorage := s.NewMetricsStorage(l)
-	metricStorage := h.Storage{
-		Storage: memStorage,
-		Logger:  memStorage.Logger,
-	}
+	s := storage.GetStorage(false, nil, l)
+	memStorage := h.NewStorage(s, l)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		v.GzipMiddleware(http.HandlerFunc(metricStorage.GetMetricsHandler)).ServeHTTP(w, r)
+		v.GzipMiddleware(http.HandlerFunc(memStorage.MetricHandler)).ServeHTTP(w, r)
 	})
 
 	srv := httptest.NewServer(handler)
@@ -46,7 +42,7 @@ func TestRouter(t *testing.T) {
 	var testTable = []testTable{
 		{"/update/counter/Mallocs/777", `{"id": "test_Mallocs", "type": "counter", "delta": 5, "value": 123.4}`, `{"id":"test_Mallocs","type":"counter","delta":5}`, http.StatusOK},
 		{"/update/counter/Mallocs/777", `{"id": "test_Mallocs", "type": "counter", "delta": 6, "value": 123.4}`, `{"id":"test_Mallocs","type":"counter","delta":11}`, http.StatusOK}, // expected 5+5=10
-		{"/update/gauge/Alloc/777", `{"id": "test_Alloc", "type": "gauge", "delta": 6, "value": 123.4}`, `{"id":"test_Alloc","type":"gauge","delta":6,"value":123.4}`, http.StatusOK},
+		{"/update/gauge/Alloc/777", `{"id": "test_Alloc", "type": "gauge", "value": 123.4}`, `{"id":"test_Alloc","type":"gauge","value":123.4}`, http.StatusOK},
 	}
 	for _, v := range testTable {
 		t.Run("sends_gzip", func(t *testing.T) {
@@ -78,26 +74,22 @@ func TestRouter(t *testing.T) {
 
 func TestGzipCompression(t *testing.T) {
 	l, err := logging.NewZapLogger(zap.InfoLevel)
-
 	if err != nil {
 		log.Panic(err)
 	}
+	s := storage.GetStorage(false, nil, l)
 
-	storageImpl := s.NewMetricsStorage(l)
-	metricStorage := h.Storage{
-		Storage: storageImpl,
-		Logger:  storageImpl.Logger,
-	}
+	ms := h.NewStorage(s, l)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		v.GzipMiddleware(http.HandlerFunc(metricStorage.GetMetricsHandler)).ServeHTTP(w, r)
+		v.GzipMiddleware(http.HandlerFunc(ms.MetricHandler)).ServeHTTP(w, r)
 	})
 
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
-	requestBody := `{"id": "testSetGet33", "type": "gauge", "delta": 1, "value": 123.4}`
-	successBody := `{"id":"testSetGet33","type":"gauge","delta":1,"value":123.4}`
+	requestBody := `{"id": "testSetGet33", "type": "gauge", "value": 123.4}`
+	successBody := `{"id":"testSetGet33","type":"gauge","value":123.4}`
 
 	t.Run("sends_gzip", func(t *testing.T) {
 		buf := bytes.NewBuffer(nil)

@@ -48,21 +48,21 @@ func SendToServer(client *http.Client, url string, m models.Metrics, l *logging.
 
 	resp, err := client.Do(req)
 	if err != nil {
-		l.ErrorCtx(ctx, "compressedBody", zap.String("", fmt.Sprintf("Error sending request:%v", err)))
+		l.InfoCtx(ctx, "compressedBody11", zap.String("", fmt.Sprintf("Error sending request:%v", err)))
 		return err
 	}
 
 	if resp.Header.Get("Content-Encoding") == "gzip" {
 		buf, err := decompressReader(ctx, resp.Body, l)
 		if err != nil {
-			l.ErrorCtx(ctx, "compressedBody", zap.String("", fmt.Sprintf("Error decompressing response body:%v", err)))
+			l.ErrorCtx(ctx, "compressedBody1", zap.String("", fmt.Sprintf("Error decompressing response body:%v", err)))
 			return err
 		}
 		os.Stdout.Write(buf.Bytes())
 	} else {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			l.ErrorCtx(ctx, "compressedBody", zap.String("", fmt.Sprintf("Error reading response body:%v", err)))
+			l.ErrorCtx(ctx, "compressedBody2", zap.String("", fmt.Sprintf("Error reading response body:%v", err)))
 			return err
 		}
 		os.Stdout.Write(body)
@@ -72,7 +72,7 @@ func SendToServer(client *http.Client, url string, m models.Metrics, l *logging.
 	defer resp.Body.Close()
 
 	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
-		l.ErrorCtx(ctx, "compressedBody", zap.String("", fmt.Sprintf("Error discarding response body:%v", err)))
+		l.ErrorCtx(ctx, "compressedBody3", zap.String("", fmt.Sprintf("Error discarding response body:%v", err)))
 	}
 
 	return nil
@@ -83,12 +83,12 @@ func compressedBody(ctx context.Context, body []byte, l *logging.ZapLogger) ([]b
 	zw := gzip.NewWriter(&buf)
 	_, err := zw.Write(body)
 	if err != nil {
-		l.FatalCtx(ctx, "compressedBody", zap.String("", fmt.Sprintf("Error compressing request body:%v", err)))
+		l.FatalCtx(ctx, "compressedBody4", zap.String("", fmt.Sprintf("Error compressing request body:%v", err)))
 		return nil, err
 	}
 	err = zw.Close()
 	if err != nil {
-		l.FatalCtx(ctx, "compressedBody", zap.String("", fmt.Sprintf("gzip close error:%v", err)))
+		l.FatalCtx(ctx, "compressedBody5", zap.String("", fmt.Sprintf("gzip close error:%v", err)))
 		return nil, err
 	}
 	compressedBody := buf.Bytes()

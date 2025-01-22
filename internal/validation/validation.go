@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/sanek1/metrics-collector/internal/config"
+	"github.com/sanek1/metrics-collector/internal/handlers"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
 	"go.uber.org/zap"
 )
@@ -13,11 +14,13 @@ type Middleware func(http.Handler) http.Handler
 
 type MiddlewareController struct {
 	l *l.ZapLogger
+	s *handlers.Storage
 }
 
-func New(logger *l.ZapLogger) *MiddlewareController {
+func New(s *handlers.Storage, logger *l.ZapLogger) *MiddlewareController {
 	return &MiddlewareController{
 		l: logger,
+		s: s,
 	}
 }
 
@@ -51,5 +54,16 @@ func (c *MiddlewareController) ValidationOld(next http.Handler) func(http.Respon
 			return
 		}
 		next.ServeHTTP(rw, r)
+	})
+}
+
+func (c *MiddlewareController) CheckForPingMiddleware(next http.Handler) func(http.ResponseWriter, *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/ping") {
+			c.l.InfoCtx(r.Context(), "ping request")
+			c.s.PingDBHandler(w, r)
+		} else {
+			http.StripPrefix(r.URL.Path, next).ServeHTTP(w, r)
+		}
 	})
 }

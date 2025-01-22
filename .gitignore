@@ -30,3 +30,4 @@ vendor/
 /internal/controller/File_Log_Store.json
 /logs
 /.runtime
+/BACKUP
