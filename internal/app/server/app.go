@@ -37,7 +37,7 @@ func New(opt *flags.ServerOptions, useDatabase bool) *App {
 		}
 	}
 	fs := storage.NewMetricsStorage(logger)
-	ctrl := c.NewController(fs, s, logger)
+	ctrl := c.NewController(fs, s, opt, logger)
 
 	return &App{
 		controller:    ctrl,

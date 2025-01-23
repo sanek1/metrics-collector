@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi"
+	flags "github.com/sanek1/metrics-collector/internal/flags/server"
 	h "github.com/sanek1/metrics-collector/internal/handlers"
 	storage "github.com/sanek1/metrics-collector/internal/storage/server"
 	v "github.com/sanek1/metrics-collector/internal/validation"
@@ -11,28 +12,35 @@ import (
 )
 
 type Controller struct {
-	r          chi.Router
-	l          *l.ZapLogger
-	middleware *v.MiddlewareController
-	storage    storage.Storage
-	s          *h.Storage
+	r              chi.Router
+	l              *l.ZapLogger
+	middleware     *v.MiddlewareController
+	middlewareHash *v.Secret
+	storage        storage.Storage
+	s              *h.Storage
+	opt            *flags.ServerOptions
 }
 
-func New(s storage.Storage, logger *l.ZapLogger) *Controller {
+func New(s storage.Storage, opt *flags.ServerOptions, logger *l.ZapLogger) *Controller {
 	c := &Controller{
 		l:       logger,
 		r:       chi.NewRouter(),
 		storage: s,
+		opt:     opt,
 	}
 
 	c.s = h.NewStorage(s, logger)
 	c.middleware = v.New(c.s, logger)
+	c.middlewareHash = v.NewHash(opt.CryptoKey)
 	return c
 }
 
 func (c *Controller) InitRouting() http.Handler {
 	r := chi.NewRouter()
 	r.Use(c.middleware.Recover, v.GzipMiddleware)
+	if c.opt.CryptoKey != "" {
+		r.Use(c.middlewareHash.HashMiddleware)
+	}
 
 	r.Route("/", func(r chi.Router) {
 		// Get routes

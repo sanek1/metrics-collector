@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	flags "github.com/sanek1/metrics-collector/internal/flags/server"
 	m "github.com/sanek1/metrics-collector/internal/models"
 	storage "github.com/sanek1/metrics-collector/internal/storage/server"
 	"github.com/sanek1/metrics-collector/pkg/logging"
@@ -40,8 +41,9 @@ func TestController_PeriodicallySaveBackUp(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
+	opt := flags.ParseServerFlags()
 
-	ctrl := NewController(storage.NewMetricsStorage(logger), storage.NewMetricsStorage(logger), logger)
+	ctrl := NewController(storage.NewMetricsStorage(logger), storage.NewMetricsStorage(logger), opt, logger)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
