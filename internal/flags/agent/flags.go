@@ -11,6 +11,7 @@ type Options struct {
 	FlagRunAddr    string
 	ReportInterval int64
 	PollInterval   int64
+	CryptoKey      string
 }
 
 const (
@@ -24,6 +25,7 @@ func ParseFlags() *Options {
 	flag.StringVar(&opt.FlagRunAddr, "a", ":8080", "address and port to run server")
 	flag.Int64Var(&opt.ReportInterval, "r", defaultReportInterval, "report interval in seconds")
 	flag.Int64Var(&opt.PollInterval, "p", defaultPollInterval, "poll interval in seconds")
+	flag.StringVar(&opt.CryptoKey, "k", "", "key to encrypt/decrypt metrics")
 	flag.Parse()
 
 	if len(flag.Args()) > 0 {
@@ -41,6 +43,10 @@ func ParseFlags() *Options {
 
 	if interval := os.Getenv("POLL_INTERVAL"); interval != "" {
 		opt.PollInterval, _ = strconv.ParseInt(interval, 10, 64)
+	}
+
+	if key := os.Getenv("KEY"); key != "" {
+		opt.CryptoKey = key
 	}
 	return opt
 }
