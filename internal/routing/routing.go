@@ -18,6 +18,7 @@ type Controller struct {
 	middlewareHash *v.Secret
 	storage        storage.Storage
 	s              *h.Storage
+	opt            *flags.ServerOptions
 }
 
 func New(s storage.Storage, opt *flags.ServerOptions, logger *l.ZapLogger) *Controller {
@@ -25,6 +26,7 @@ func New(s storage.Storage, opt *flags.ServerOptions, logger *l.ZapLogger) *Cont
 		l:       logger,
 		r:       chi.NewRouter(),
 		storage: s,
+		opt:     opt,
 	}
 
 	c.s = h.NewStorage(s, logger)
@@ -35,7 +37,10 @@ func New(s storage.Storage, opt *flags.ServerOptions, logger *l.ZapLogger) *Cont
 
 func (c *Controller) InitRouting() http.Handler {
 	r := chi.NewRouter()
-	r.Use(c.middleware.Recover, v.GzipMiddleware, c.middlewareHash.HashMiddleware)
+	r.Use(c.middleware.Recover, v.GzipMiddleware)
+	if c.opt.CryptoKey != "" {
+		r.Use(c.middlewareHash.HashMiddleware)
+	}
 
 	r.Route("/", func(r chi.Router) {
 		// Get routes

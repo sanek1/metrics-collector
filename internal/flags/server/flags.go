@@ -40,7 +40,7 @@ const (
 
 func ParseServerFlags() *ServerOptions {
 	opt := &ServerOptions{}
-	defaultPathDB := ""
+	defaultPathDB := initDefaulthPathDB()
 	flag.StringVar(&opt.FlagRunAddr, "a", ":8080", "address and port to run server")
 	flag.Int64Var(&opt.StoreInterval, "i", defaultStoreInterval, "address and port to run server")
 	flag.StringVar(&opt.Path, "f", defaultFileName, "address and port to run server")
@@ -85,4 +85,9 @@ func ParseServerFlags() *ServerOptions {
 	}
 
 	return opt
+}
+
+func initDefaulthPathDB() string {
+	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		defaultHost, defaultPort, defaultUser, defaultPassword, defaultDatabase, defaultSSLMode)
 }
