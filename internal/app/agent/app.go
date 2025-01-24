@@ -35,7 +35,6 @@ func New(opt *flags.Options) *App {
 		logger:     logger,
 	}
 }
-
 func (a *App) Run() error {
 	ctx := context.Background()
 

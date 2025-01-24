@@ -64,11 +64,12 @@ func Test_reportClient(t *testing.T) {
 	ctx := context.Background()
 	logger, _ := l.NewZapLogger(zap.InfoLevel)
 	logger.InfoCtx(ctx, "agent started ", zap.String("time: ", time.DateTime))
+	s := NewServices(logger)
 
 	for _, tt := range tests {
 		t.Run(tt.ID, func(t *testing.T) {
 			metricURL := fmt.Sprint(testServer.URL, "/update/gauge/"+tt.ID+"/"+fmt.Sprintf("%f", *tt.Value))
-			err := SendToServer(&http.Client{}, metricURL, tt, logger)
+			err := s.SendToServer(ctx, &http.Client{}, metricURL, tt)
 			assert.Equal(t, err, nil)
 		})
 	}
