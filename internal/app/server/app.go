@@ -6,69 +6,61 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-	c "github.com/sanek1/metrics-collector/internal/controller/server"
-	flags "github.com/sanek1/metrics-collector/internal/flags/server"
-	storage "github.com/sanek1/metrics-collector/internal/storage/server"
+	sc "github.com/sanek1/metrics-collector/internal/controller/server"
+	sf "github.com/sanek1/metrics-collector/internal/flags/server"
+	ss "github.com/sanek1/metrics-collector/internal/storage/server"
 	"github.com/sanek1/metrics-collector/pkg/logging"
 	"go.uber.org/zap"
 )
 
 type App struct {
-	controller    *c.Controller
-	addr          string
-	storeInterval int64
-	path          string
-	restore       bool
-	logger        *logging.ZapLogger
-	storage       storage.Storage
+	options     *sf.ServerOptions
+	useDatabase bool
 }
 
-func New(opt *flags.ServerOptions, useDatabase bool) *App {
-	// init zap logger
-	logger, err := logging.NewZapLogger(zap.ErrorLevel)
-	if err != nil {
-		panic(err)
-	}
-	s := storage.GetStorage(useDatabase, opt, logger)
-	if useDatabase {
-		if _, ok := s.(*storage.DBStorage); !ok {
-			logger.InfoCtx(context.Background(), opt.DBPath, zap.Error(err))
-			logger.ErrorCtx(context.Background(), "Error connecting to database", zap.Error(err))
-		}
-	}
-	fs := storage.NewMetricsStorage(logger)
-	ctrl := c.NewController(fs, s, opt, logger)
-
+func New(opt *sf.ServerOptions, useDatabase bool) *App {
 	return &App{
-		controller:    ctrl,
-		addr:          opt.FlagRunAddr,
-		storeInterval: opt.StoreInterval,
-		path:          opt.Path,
-		restore:       opt.Restore,
-		logger:        logger,
-		storage:       s,
+		options:     opt,
+		useDatabase: useDatabase,
 	}
 }
 
 func (a *App) Run() error {
 	ctx := context.Background()
+	l, err := logging.NewZapLogger(zap.InfoLevel)
+	if err != nil {
+		panic(err)
+	}
+	ctx = l.WithContextFields(ctx, zap.String("app", "Server"))
+
+	storage := ss.GetStorage(a.useDatabase, a.options, l)
+	if a.useDatabase {
+		if _, ok := storage.(*ss.DBStorage); !ok {
+			l.ErrorCtx(context.Background(), "Error connecting to database", zap.Error(err))
+		}
+	}
+
+	fs := ss.NewMetricsStorage(l)
+	ctrl := sc.NewController(fs, storage, a.options, l)
+
+	if fs, ok := storage.(ss.FileStorage); ok {
+		go fs.PeriodicallySaveBackUp(ctx, a.options.Path, a.options.Restore, time.Duration(a.options.StoreInterval)*time.Second)
+	}
+	if dbs, ok := storage.(ss.DatabaseStorage); ok {
+		if err := dbs.EnsureMetricsTableExists(ctx); err != nil {
+			l.ErrorCtx(ctx, "failed to ensure Metrics table exists", zap.Error(err))
+		}
+	}
+
 	server := &http.Server{
-		Addr:              a.addr,
-		Handler:           a.controller.Router(),
+		Addr:              a.options.FlagRunAddr,
+		Handler:           ctrl.Router(),
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	a.logger.InfoCtx(ctx, "Running server", zap.String("address%s", a.addr))
 
-	if fs, ok := a.storage.(storage.FileStorage); ok {
-		go fs.PeriodicallySaveBackUp(ctx, a.path, a.restore, time.Duration(a.storeInterval)*time.Second)
-	}
-	if dbs, ok := a.storage.(storage.DatabaseStorage); ok {
-		if err := dbs.EnsureMetricsTableExists(ctx); err != nil {
-			a.logger.ErrorCtx(ctx, "failed to ensure Metrics table exists", zap.Error(err))
-		}
-	}
+	l.InfoCtx(ctx, "Running server", zap.String("address%s", a.options.FlagRunAddr))
 	return server.ListenAndServe()
 }

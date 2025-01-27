@@ -5,32 +5,35 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 
+	flags "github.com/sanek1/metrics-collector/internal/flags/agent"
 	"github.com/sanek1/metrics-collector/internal/models"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
 	"go.uber.org/zap"
 )
 
+const (
+	batchSizeBuffer     = 10
+	maxDecompressedSize = 10 * 1024 * 1024 // 10 MB
+)
+
 type Services struct {
-	l *l.ZapLogger
+	options *flags.Options
+	l       *l.ZapLogger
 }
 
-func NewServices(l *l.ZapLogger) *Services {
-	return &Services{l: l}
-}
-
-func (s Services) preparingMetrics(ctx context.Context, url string, m models.Metrics) (*http.Request, error) {
-	body, err := json.Marshal(m)
-	if err != nil {
-		s.l.WarnCtx(ctx, "", zap.String("", fmt.Sprintf("Error building request body:%v", err)))
-		return nil, err
+func NewServices(options *flags.Options, zl *l.ZapLogger) *Services {
+	return &Services{
+		options: options,
+		l:       zl,
 	}
-	/// compress request body
+}
+
+func (s Services) preparingMetrics(ctx context.Context, url string, body []byte) (*http.Request, error) {
 	compressedBody, err := s.compressedBody(ctx, body)
 	if err != nil {
 		s.l.WarnCtx(ctx, "", zap.String("", fmt.Sprintf("Error compressing request body:%v", err)))
@@ -39,7 +42,7 @@ func (s Services) preparingMetrics(ctx context.Context, url string, m models.Met
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(compressedBody))
 	if err != nil {
-		s.l.WarnCtx(ctx, "", zap.String("", fmt.Sprintf("Error creating request:%v", err)))
+		s.l.WarnCtx(ctx, "Error creating request", zap.String("url", url), zap.Error(err))
 		return nil, err
 	}
 
@@ -55,9 +58,9 @@ func (s Services) preparingMetrics(ctx context.Context, url string, m models.Met
 	return req, nil
 }
 
-func (s Services) ProcessingResponseServer(ctx context.Context, resp *http.Response) error {
+func (s Services) processingResponseServer(ctx context.Context, resp *http.Response) error {
 	if resp.Header.Get("Content-Encoding") == "gzip" {
-		buf, err := s.decompressReader(ctx, resp.Body)
+		buf, err := s.decompressBody(ctx, resp.Body)
 		if err != nil {
 			s.l.ErrorCtx(ctx, "compressedBody1", zap.String("", fmt.Sprintf("Error decompressing response body:%v", err)))
 			return err
@@ -94,9 +97,7 @@ func (s Services) compressedBody(ctx context.Context, body []byte) ([]byte, erro
 	return buf.Bytes(), nil
 }
 
-func (s Services) decompressReader(ctx context.Context, body io.ReadCloser) (*bytes.Buffer, error) {
-	const maxDecompressedSize = 20 // 20 MB
-
+func (s Services) decompressBody(ctx context.Context, body io.ReadCloser) (*bytes.Buffer, error) {
 	gzReader, err := gzip.NewReader(body)
 	if err != nil {
 		s.l.FatalCtx(ctx, "decompressReader", zap.String("", fmt.Sprintf("Error reading response body:%v", err)))
@@ -105,13 +106,38 @@ func (s Services) decompressReader(ctx context.Context, body io.ReadCloser) (*by
 
 	buf := new(bytes.Buffer)
 	writer := bufio.NewWriter(buf)
+	limitedReader := io.LimitReader(gzReader, maxDecompressedSize)
 
-	_, err = io.Copy(writer, gzReader)
+	_, err = io.Copy(writer, limitedReader)
 	if err != nil && err != io.EOF {
-		s.l.FatalCtx(ctx, "decompressReader", zap.String("", fmt.Sprintf("Error when copying:%v", err)))
+		s.l.FatalCtx(ctx, "decompressReader", zap.String("", fmt.Sprintf("Error when copying: %v", err)))
 		return nil, err
 	}
 
-	writer.Flush()
+	if err := writer.Flush(); err != nil {
+		s.l.FatalCtx(ctx, "decompressReader", zap.String("", fmt.Sprintf("Error flushing writer: %v", err)))
+		return nil, err
+	}
+
 	return buf, nil
+}
+
+func (s Services) worker(ctx context.Context, client *http.Client, url string, jobs <-chan models.Metrics) {
+	var metrics []models.Metrics
+	for j := range jobs {
+		metrics = append(metrics, j)
+		if len(metrics) == batchSizeBuffer {
+			s.sendMetricsBatch(ctx, client, url, metrics)
+			metrics = nil
+		}
+	}
+	s.sendMetricsBatch(ctx, client, url, metrics)
+}
+
+func (s Services) sendMetricsBatch(ctx context.Context, client *http.Client, url string, metrics []models.Metrics) {
+	if len(metrics) > 0 {
+		if err := s.SendToServerBatchMetrics(ctx, client, url, metrics); err != nil {
+			s.l.ErrorCtx(ctx, "SendToServer3 failed", zap.Error(err))
+		}
+	}
 }

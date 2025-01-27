@@ -27,3 +27,15 @@ func NewMetricGauge(id string, value *float64) *Metrics {
 		Value: value,
 	}
 }
+
+func NewArrMetricGauge(metrics map[string]float64) []Metrics {
+	result := make([]Metrics, 0, len(metrics))
+	for id, value := range metrics {
+		result = append(result, Metrics{
+			ID:    id,
+			MType: TypeGauge,
+			Value: &value,
+		})
+	}
+	return result
+}

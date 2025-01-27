@@ -9,8 +9,8 @@ import (
 	"time"
 
 	ac "github.com/sanek1/metrics-collector/internal/controller/agent"
-	flags "github.com/sanek1/metrics-collector/internal/flags/agent"
-	storage "github.com/sanek1/metrics-collector/internal/storage/agent"
+	af "github.com/sanek1/metrics-collector/internal/flags/agent"
+	as "github.com/sanek1/metrics-collector/internal/storage/agent"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
 	"go.uber.org/zap"
 )
@@ -21,25 +21,37 @@ const (
 
 type App struct {
 	controller *ac.Controller
-	opt        *flags.Options
+	opt        *af.Options
 	logger     *l.ZapLogger
 }
 
-func New(opt *flags.Options) *App {
+func New(opt *af.Options) *App {
 	logger := startLogger()
-	ctrl := ac.New(opt, logger)
-
+	ctrl := ac.NewController(opt, logger)
 	return &App{
 		controller: ctrl,
 		opt:        opt,
-		logger:     logger,
 	}
 }
 func (a *App) Run() error {
 	ctx := context.Background()
 
-	pollTick, reportTick, metrics := initDataAgent(a.opt)
-	client := &http.Client{}
+	if err := a.startAgent(ctx); err != nil {
+		a.logger.ErrorCtx(ctx, "Error starting agent", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+func (a *App) startAgent(ctx context.Context) error {
+	pollTick, reportTick, metrics, gpMetrics := initDataAgent(a.opt)
+	client := &http.Client{
+		Transport: &http.Transport{
+			MaxIdleConnsPerHost: 100,
+			IdleConnTimeout:     90 * time.Second,
+		},
+		Timeout: 10 * time.Second,
+	}
 	var pollCount int64 = 0
 
 	defer func() {
@@ -51,11 +63,13 @@ func (a *App) Run() error {
 		select {
 		case <-pollTick.C:
 			pollCount++
-			storage.InitPoolMetrics(metrics)
+			as.InitPoolMetrics(metrics)
+			as.GetGopsuiteMetrics(gpMetrics)
 		case <-reportTick.C:
 			fmt.Fprintf(os.Stdout, "--------- start response ---------\n\n")
 			a.controller.SendingCounterMetrics(ctx, &pollCount, client)
 			a.controller.SendingGaugeMetrics(ctx, metrics, client)
+			a.controller.SendingGaugeMetrics(ctx, gpMetrics, client)
 			fmt.Fprintf(os.Stdout, "--------- end response ---------\n\n")
 			fmt.Fprintf(os.Stdout, "--------- NEW ITERATION %d ---------> \n\n", pollCount)
 		}
@@ -64,7 +78,7 @@ func (a *App) Run() error {
 
 func startLogger() *l.ZapLogger {
 	ctx := context.Background()
-	logger, err := l.NewZapLogger(zap.InfoLevel)
+	logger, err := l.NewZapLogger(zap.DebugLevel)
 
 	if err != nil {
 		log.Panic(err)
@@ -77,9 +91,10 @@ func startLogger() *l.ZapLogger {
 	return logger
 }
 
-func initDataAgent(opt *flags.Options) (pollTick, reportTick *time.Ticker, metrics map[string]float64) {
+func initDataAgent(opt *af.Options) (pollTick, reportTick *time.Ticker, metrics, gpMetrics map[string]float64) {
 	pollTick = time.NewTicker(time.Duration(opt.PollInterval) * time.Second)
 	reportTick = time.NewTicker(time.Duration(opt.ReportInterval) * time.Second)
 	metrics = make(map[string]float64, countMetrics)
-	return pollTick, reportTick, metrics
+	gpMetrics = make(map[string]float64, countMetrics)
+	return pollTick, reportTick, metrics, gpMetrics
 }

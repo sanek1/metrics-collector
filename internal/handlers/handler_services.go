@@ -107,7 +107,6 @@ func (s *Services) ParseMetricsServices(rw http.ResponseWriter, r *http.Request)
 
 	var model m.Metrics
 	if err := json.Unmarshal(bodyBytes, &model); err != nil {
-		s.logger.InfoCtx(r.Context(), "The metric was not parsed", zap.Any("err", err.Error()))
 		if err := json.Unmarshal(bodyBytes, &models); err != nil {
 			s.logger.ErrorCtx(r.Context(), "The metric was not parsed", zap.Any("err", err.Error()))
 			return nil, fmt.Errorf("unmarshal: %w", err)

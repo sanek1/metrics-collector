@@ -4,9 +4,9 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi"
-	flags "github.com/sanek1/metrics-collector/internal/flags/server"
+	sf "github.com/sanek1/metrics-collector/internal/flags/server"
 	h "github.com/sanek1/metrics-collector/internal/handlers"
-	storage "github.com/sanek1/metrics-collector/internal/storage/server"
+	ss "github.com/sanek1/metrics-collector/internal/storage/server"
 	v "github.com/sanek1/metrics-collector/internal/validation"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
 )
@@ -16,12 +16,12 @@ type Controller struct {
 	l              *l.ZapLogger
 	middleware     *v.MiddlewareController
 	middlewareHash *v.Secret
-	storage        storage.Storage
+	storage        ss.Storage
 	s              *h.Storage
-	opt            *flags.ServerOptions
+	opt            *sf.ServerOptions
 }
 
-func New(s storage.Storage, opt *flags.ServerOptions, logger *l.ZapLogger) *Controller {
+func NewRouting(s ss.Storage, opt *sf.ServerOptions, logger *l.ZapLogger) *Controller {
 	c := &Controller{
 		l:       logger,
 		r:       chi.NewRouter(),
@@ -30,7 +30,7 @@ func New(s storage.Storage, opt *flags.ServerOptions, logger *l.ZapLogger) *Cont
 	}
 
 	c.s = h.NewStorage(s, logger)
-	c.middleware = v.New(c.s, logger)
+	c.middleware = v.NewValidation(c.s, logger)
 	c.middlewareHash = v.NewHash(opt.CryptoKey)
 	return c
 }

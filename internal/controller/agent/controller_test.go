@@ -17,7 +17,7 @@ func TestSendingGaugeMetrics(t *testing.T) {
 	client := &http.Client{}
 	opt := &flags.Options{FlagRunAddr: ":8080"}
 
-	ctrl := New(opt, l)
+	ctrl := NewController(opt, l)
 
 	metrics := map[string]float64{
 		"gauge1": 10.56,

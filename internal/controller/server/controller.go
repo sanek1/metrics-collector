@@ -4,21 +4,21 @@ import (
 	"context"
 	"net/http"
 
-	flags "github.com/sanek1/metrics-collector/internal/flags/server"
+	sf "github.com/sanek1/metrics-collector/internal/flags/server"
 	"github.com/sanek1/metrics-collector/internal/routing"
-	storage "github.com/sanek1/metrics-collector/internal/storage/server"
+	ss "github.com/sanek1/metrics-collector/internal/storage/server"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
 )
 
 type Controller struct {
-	storage    storage.Storage
-	fieStorage storage.FileStorage
+	storage    ss.Storage
+	fieStorage ss.FileStorage
 	router     http.Handler
 	logger     *l.ZapLogger
 }
 
-func NewController(fs storage.FileStorage, s storage.Storage, opt *flags.ServerOptions, logger *l.ZapLogger) *Controller {
-	r := routing.New(s, opt, logger)
+func NewController(fs ss.FileStorage, s ss.Storage, opt *sf.ServerOptions, logger *l.ZapLogger) *Controller {
+	r := routing.NewRouting(s, opt, logger)
 	return &Controller{
 		storage:    s,
 		fieStorage: fs,

@@ -84,13 +84,13 @@ tasks:
         - metricstest -test.v -test.run=^TestIteration2[AB]*$ -source-path=. -agent-binary-path=cmd/agent/agent >> logs/test2.log
         - metricstest -test.v -test.run=^TestIteration3[AB]*$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server >> logs/test3.log
         - metricstest -test.v -test.run=^TestIteration4$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080 >> logs/test4.log
-        #- metricstest -test.v -test.run=^TestIteration5$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080 >> logs/test5.log
-        #- metricstest -test.v -test.run=^TestIteration6$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080 >> logs/test6.log
-        #- metricstest -test.v -test.run=^TestIteration7$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080 >> logs/test7.log
-        #- metricstest -test.v -test.run=^TestIteration8$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080 >> logs/test8.log
-        #- metricstest -test.v -test.run=^TestIteration9$ -file-storage-path=./BACKUP -source-path=\. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080 >> logs/test9.log
+        - metricstest -test.v -test.run=^TestIteration5$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080 >> logs/test5.log
+        - metricstest -test.v -test.run=^TestIteration6$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080 >> logs/test6.log
+        - metricstest -test.v -test.run=^TestIteration7$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080 >> logs/test7.log
+        - metricstest -test.v -test.run=^TestIteration8$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080 >> logs/test8.log
+        - metricstest -test.v -test.run=^TestIteration9$ -file-storage-path=./BACKUP -source-path=\. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080 >> logs/test9.log
   
-         #- metricstest -test.v -test.run=^TestIteration10$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080  -database-dsn="host=localhost port=5432 user=postgres password=admin dbname=MetricStore sslmode=disable" >> logs/test10.log
+        - metricstest -test.v -test.run=^TestIteration10$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080  -database-dsn="host=localhost port=5432 user=postgres password=admin dbname=MetricStore sslmode=disable" >> logs/test10.log
 
         - metricstest -test.v -test.run=^TestIteration11$ -source-path=. -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server -server-port=8080  -database-dsn="host=localhost port=5432 user=postgres password=admin dbname=MetricStore sslmode=disable" >> logs/test11.log
 
