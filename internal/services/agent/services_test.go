@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	flags "github.com/sanek1/metrics-collector/internal/flags/agent"
 	m "github.com/sanek1/metrics-collector/internal/models"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
 	"github.com/stretchr/testify/assert"
@@ -64,11 +65,13 @@ func Test_reportClient(t *testing.T) {
 	ctx := context.Background()
 	logger, _ := l.NewZapLogger(zap.InfoLevel)
 	logger.InfoCtx(ctx, "agent started ", zap.String("time: ", time.DateTime))
+	opt := flags.ParseFlags()
+	s := NewServices(opt, logger)
 
 	for _, tt := range tests {
 		t.Run(tt.ID, func(t *testing.T) {
 			metricURL := fmt.Sprint(testServer.URL, "/update/gauge/"+tt.ID+"/"+fmt.Sprintf("%f", *tt.Value))
-			err := SendToServer(&http.Client{}, metricURL, tt, logger)
+			err := s.SendToServerMetric(ctx, &http.Client{}, metricURL, tt)
 			assert.Equal(t, err, nil)
 		})
 	}

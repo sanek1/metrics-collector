@@ -26,6 +26,7 @@ type Storage struct {
 
 func NewStorage(s storage.Storage, zl *l.ZapLogger) *Storage {
 	hs := NewHandlerServices(s, nil, zl)
+
 	return &Storage{Storage: s, Logger: zl, handlerServices: hs}
 }
 
@@ -60,7 +61,7 @@ func (s Storage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.Request
 		}
 		return
 	}
-	http.Error(rw, "No such value exists", http.StatusNotFound)
+	http.Error(rw, "No such value exists1", http.StatusNotFound)
 }
 
 func (s Storage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http.Request) {
@@ -80,7 +81,7 @@ func (s Storage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http.Reques
 		SendResultStatusOK(rw, resp)
 		return
 	} else {
-		http.Error(rw, "No such value exists", http.StatusNotFound)
+		http.Error(rw, "No such value exists2", http.StatusNotFound)
 		return
 	}
 }
@@ -93,9 +94,6 @@ func (s Storage) MetricHandler(rw http.ResponseWriter, r *http.Request) {
 		SendResultStatusNotOK(rw, []byte(`{"error": "failed to read body"}`))
 		return
 	}
-	ctx = s.Logger.WithContextFields(ctx,
-		zap.String("type", models[0].MType))
-
 	s.handlerServices.models = &models
 	switch models[0].MType {
 	case "counter":
@@ -103,7 +101,7 @@ func (s Storage) MetricHandler(rw http.ResponseWriter, r *http.Request) {
 	case "gauge":
 		s.handlerServices.GaugeService(ctx, rw)
 	default:
-		http.Error(rw, "No such value exists", http.StatusNotFound)
+		http.Error(rw, "No such value exists3", http.StatusNotFound)
 		return
 	}
 }

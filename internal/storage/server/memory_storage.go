@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"sync"
@@ -38,7 +37,7 @@ func (ms *MetricsStorage) SetGauge(ctx context.Context, models ...m.Metrics) ([]
 	errors := make([]error, len(models))
 
 	for i, model := range models {
-		SetLog(ctx, ms, &model, "SetGauge")
+		ms.SetLog(ctx, &model)
 		ms.Metrics[model.ID] = m.Metrics{ID: model.ID, MType: model.MType, Value: model.Value}
 		res := ms.Metrics[model.ID]
 		results[i] = &res
@@ -67,7 +66,7 @@ func (ms *MetricsStorage) SetCounter(ctx context.Context, models ...m.Metrics) (
 	errors := make([]error, len(models))
 
 	for i, model := range models {
-		SetLog(ctx, ms, &model, "SetCounter")
+		ms.SetLog(ctx, &model)
 		metric, exists := ms.Metrics[model.ID]
 		if exists && metric.Delta != nil {
 			*metric.Delta += *model.Delta
@@ -123,9 +122,4 @@ func (ms *MetricsStorage) GetMetrics(ctx context.Context, key, metricName string
 		return nil, false
 	}
 	return &metric, true
-}
-
-func formatMetric(model m.Metrics) string {
-	data, _ := json.Marshal(model) //
-	return string(data)
 }

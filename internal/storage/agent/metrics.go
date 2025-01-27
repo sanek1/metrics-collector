@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"log"
 	"runtime"
+
+	"github.com/shirou/gopsutil/v3/mem"
 )
 
 func InitPoolMetrics(metrics map[string]float64) {
@@ -43,4 +45,16 @@ func InitPoolMetrics(metrics map[string]float64) {
 	metrics["Sys"] = float64(rtm.Sys)
 	metrics["TotalAlloc"] = float64(rtm.TotalAlloc)
 	metrics["RandomValue"] = float64(num)
+}
+
+func GetGopsuiteMetrics(gpMetrics map[string]float64) map[string]float64 {
+	v, err := mem.VirtualMemory()
+	if err != nil {
+		log.Printf("Error getting virtual memory: %v", err)
+		return gpMetrics
+	}
+	gpMetrics["TotalMemory"] = float64(v.Total)
+	gpMetrics["FreeMemory"] = float64(v.Available)
+	gpMetrics["CPUutilization1"] = float64(v.Used)
+	return gpMetrics
 }
