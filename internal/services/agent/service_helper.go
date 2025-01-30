@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -36,25 +35,19 @@ func NewServices(options *flags.Options, zl *l.ZapLogger) *Services {
 func (s Services) preparingMetrics(ctx context.Context, url string, body []byte) (*http.Request, error) {
 	compressedBody, err := s.compressedBody(ctx, body)
 	if err != nil {
-		s.l.WarnCtx(ctx, "", zap.String("", fmt.Sprintf("Error compressing request body:%v", err)))
+		s.l.WarnCtx(ctx, "Error compressing request body", zap.Error(err))
 		return nil, err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(compressedBody))
 	if err != nil {
-		s.l.WarnCtx(ctx, "Error creating request", zap.String("url", url), zap.Error(err))
+		s.l.WarnCtx(ctx, "Error creating request", zap.Error(err))
 		return nil, err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("content-encoding", "gzip")
 	req.Header.Set("Accept-Encoding", "gzip")
-	cookie := &http.Cookie{
-		Name:   "Token",
-		Value:  "TEST_TOKEN",
-		MaxAge: 360,
-	}
-	req.AddCookie(cookie)
 	return req, nil
 }
 
@@ -62,14 +55,14 @@ func (s Services) processingResponseServer(ctx context.Context, resp *http.Respo
 	if resp.Header.Get("Content-Encoding") == "gzip" {
 		buf, err := s.decompressBody(ctx, resp.Body)
 		if err != nil {
-			s.l.ErrorCtx(ctx, "compressedBody1", zap.String("", fmt.Sprintf("Error decompressing response body:%v", err)))
+			s.l.ErrorCtx(ctx, "Error decompressing response body", zap.Error(err))
 			return err
 		}
 		os.Stdout.Write(buf.Bytes())
 	} else {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			s.l.ErrorCtx(ctx, "compressedBody2", zap.String("", fmt.Sprintf("Error reading response body:%v", err)))
+			s.l.ErrorCtx(ctx, "Error reading response body", zap.Error(err))
 			return err
 		}
 		os.Stdout.Write(body)
@@ -78,7 +71,7 @@ func (s Services) processingResponseServer(ctx context.Context, resp *http.Respo
 	defer resp.Body.Close()
 
 	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
-		s.l.ErrorCtx(ctx, "compressedBody3", zap.String("", fmt.Sprintf("Error discarding response body:%v", err)))
+		s.l.ErrorCtx(ctx, "Error discarding response body", zap.Error(err))
 	}
 	return nil
 }
@@ -87,11 +80,11 @@ func (s Services) compressedBody(ctx context.Context, body []byte) ([]byte, erro
 	var buf bytes.Buffer
 	zw := gzip.NewWriter(&buf)
 	if _, err := zw.Write(body); err != nil {
-		s.l.FatalCtx(ctx, "compressedBody4", zap.String("", fmt.Sprintf("Error compressing request body:%v", err)))
+		s.l.ErrorCtx(ctx, "error compressing body content", zap.Error(err))
 		return nil, err
 	}
 	if err := zw.Close(); err != nil {
-		s.l.FatalCtx(ctx, "compressedBody5", zap.String("", fmt.Sprintf("gzip close error:%v", err)))
+		s.l.ErrorCtx(ctx, "error closing gzip", zap.Error(err))
 		return nil, err
 	}
 	return buf.Bytes(), nil
@@ -100,7 +93,7 @@ func (s Services) compressedBody(ctx context.Context, body []byte) ([]byte, erro
 func (s Services) decompressBody(ctx context.Context, body io.ReadCloser) (*bytes.Buffer, error) {
 	gzReader, err := gzip.NewReader(body)
 	if err != nil {
-		s.l.FatalCtx(ctx, "decompressReader", zap.String("", fmt.Sprintf("Error reading response body:%v", err)))
+		s.l.FatalCtx(ctx, "Error reading response body", zap.Error(err))
 	}
 	defer gzReader.Close()
 
@@ -110,12 +103,12 @@ func (s Services) decompressBody(ctx context.Context, body io.ReadCloser) (*byte
 
 	_, err = io.Copy(writer, limitedReader)
 	if err != nil && err != io.EOF {
-		s.l.FatalCtx(ctx, "decompressReader", zap.String("", fmt.Sprintf("Error when copying: %v", err)))
+		s.l.FatalCtx(ctx, "Error when copying", zap.Error(err))
 		return nil, err
 	}
 
 	if err := writer.Flush(); err != nil {
-		s.l.FatalCtx(ctx, "decompressReader", zap.String("", fmt.Sprintf("Error flushing writer: %v", err)))
+		s.l.FatalCtx(ctx, "Error flushing writer", zap.Error(err))
 		return nil, err
 	}
 

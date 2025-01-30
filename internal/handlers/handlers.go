@@ -61,7 +61,7 @@ func (s Storage) GetMetricsByNameHandler(rw http.ResponseWriter, r *http.Request
 		}
 		return
 	}
-	http.Error(rw, "No such value exists1", http.StatusNotFound)
+	http.Error(rw, "No such value exists", http.StatusNotFound)
 }
 
 func (s Storage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http.Request) {
@@ -81,7 +81,7 @@ func (s Storage) GetMetricsByValueHandler(rw http.ResponseWriter, r *http.Reques
 		SendResultStatusOK(rw, resp)
 		return
 	} else {
-		http.Error(rw, "No such value exists2", http.StatusNotFound)
+		http.Error(rw, "No such value exists", http.StatusNotFound)
 		return
 	}
 }
