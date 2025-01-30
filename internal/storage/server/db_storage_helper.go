@@ -3,10 +3,12 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lib/pq"
 	"go.uber.org/zap"
 
@@ -14,12 +16,12 @@ import (
 	m "github.com/sanek1/metrics-collector/internal/models"
 )
 
-func startDBConnection(ctx context.Context, opt *flags.ServerOptions) (*pgx.Conn, error) {
-	conn, err := pgx.Connect(ctx, opt.DBPath)
+func startDBConnection(ctx context.Context, opt *flags.ServerOptions) (*pgxpool.Pool, error) {
+	pool, err := pgxpool.New(ctx, opt.DBPath)
 	if err != nil {
 		return nil, err
 	}
-	return conn, nil
+	return pool, nil
 }
 
 func FilterBatchesBeforeSaving(metrics []m.Metrics) []m.Metrics {
@@ -111,6 +113,12 @@ func (s *DBStorage) updateMetrics(ctx context.Context, models []m.Metrics) error
 	return err
 }
 func (s *DBStorage) insertMetric(ctx context.Context, models []m.Metrics) error {
+	conn, err := s.conn.Acquire(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to acquire connection: %w", err)
+	}
+	defer conn.Release()
+
 	batch := &pgx.Batch{}
 	for _, model := range models {
 		batch.Queue("INSERT INTO metrics (key, m_type, value, delta) VALUES ($1, $2, $3, $4)", model.ID, model.MType, model.Value, model.Delta)
@@ -119,10 +127,10 @@ func (s *DBStorage) insertMetric(ctx context.Context, models []m.Metrics) error 
 	br := s.conn.SendBatch(ctx, batch)
 	defer br.Close()
 
-	for range models {
+	for i := 0; i < batch.Len(); i++ {
 		_, err := br.Exec()
 		if err != nil {
-			s.Logger.ErrorCtx(ctx, "failed to execute batch request", zap.Error(err))
+			s.Logger.ErrorCtx(ctx, "failed to execute batch request - "+err.Error(), zap.Error(err))
 			return fmt.Errorf("failed to execute batch request: %w", err)
 		}
 	}
@@ -130,7 +138,9 @@ func (s *DBStorage) insertMetric(ctx context.Context, models []m.Metrics) error 
 }
 
 func (s *DBStorage) getMetricsOnDBs(ctx context.Context, metrics ...m.Metrics) ([]*m.Metrics, error) {
-	s.Logger.InfoCtx(ctx, "getMetricsOnDBs"+"m_types	"+fmt.Sprintf("%v", metrics), zap.Any("metrics", metrics))
+	jsonData, _ := json.Marshal(metrics)
+	s.Logger.DebugCtx(ctx, "METRICS "+string(jsonData))
+
 	query, mTypes, args := CollectorQuery(ctx, metrics)
 
 	rows, err := s.conn.Query(ctx, query, args...)

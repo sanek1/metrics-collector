@@ -17,7 +17,7 @@ type MiddlewareController struct {
 	s *handlers.Storage
 }
 
-func New(s *handlers.Storage, logger *l.ZapLogger) *MiddlewareController {
+func NewValidation(s *handlers.Storage, logger *l.ZapLogger) *MiddlewareController {
 	return &MiddlewareController{
 		l: logger,
 		s: s,
