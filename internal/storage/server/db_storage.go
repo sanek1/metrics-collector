@@ -2,8 +2,13 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 
-	"github.com/jackc/pgx/v4"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/pgx/v5"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 	flags "github.com/sanek1/metrics-collector/internal/flags/server"
 	m "github.com/sanek1/metrics-collector/internal/models"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
@@ -11,21 +16,12 @@ import (
 )
 
 type DBStorage struct {
-	conn   *pgx.Conn
+	conn   *pgxpool.Pool
 	Logger *l.ZapLogger
 }
 
 const (
 	selectAllMetricsQuery = "SELECT key, m_type, delta, value FROM metrics"
-	createMetricsQuery    = `
-		CREATE TABLE metrics (
-			id serial PRIMARY KEY,
-			key text,
-			m_type text,
-			delta bigint,
-			value double precision
-		)
-	`
 )
 
 func NewDBStorage(opt *flags.ServerOptions, logger *l.ZapLogger) *DBStorage {
@@ -100,8 +96,25 @@ func (s *DBStorage) EnsureMetricsTableExists(ctx context.Context) error {
 	}
 
 	if !exists {
-		if _, err := s.conn.Exec(ctx, createMetricsQuery); err != nil {
-			s.Logger.ErrorCtx(ctx, "failed to create Metrics table", zap.Error(err))
+		db, err := sql.Open("postgres", s.conn.Config().ConnString())
+		if err != nil {
+			s.Logger.ErrorCtx(ctx, "failed to acquire connection: %w", zap.Error(err))
+		}
+		driver, err := pgx.WithInstance(db, &pgx.Config{})
+		if err != nil {
+			s.Logger.ErrorCtx(ctx, "failed to create migration driver %w", zap.Error(err))
+		}
+
+		migration, err := migrate.NewWithDatabaseInstance(
+			"file:../../internal/storage/migrations",
+			"MetricStore",
+			driver,
+		)
+		if err != nil {
+			s.Logger.ErrorCtx(ctx, "failed to create migration instance %w", zap.Error(err))
+		}
+
+		if err := migration.Up(); err != nil && err != migrate.ErrNoChange {
 			return err
 		}
 		s.Logger.InfoCtx(ctx, "created Metrics table")

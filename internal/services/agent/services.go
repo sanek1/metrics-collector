@@ -1,121 +1,102 @@
 package services
 
 import (
-	"bufio"
 	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
+	"sync"
 
 	"github.com/sanek1/metrics-collector/internal/models"
-	"github.com/sanek1/metrics-collector/pkg/logging"
 	"go.uber.org/zap"
 )
 
-func SendToServer(client *http.Client, url string, m models.Metrics, l *logging.ZapLogger) error {
-	ctx := context.Background()
-	body, err := json.Marshal(m)
-	if err != nil {
-		l.WarnCtx(ctx, "", zap.String("", fmt.Sprintf("Error building request body:%v", err)))
-		return err
-	}
-	/// compress request body
-	compressedBody, err := compressedBody(ctx, body, l)
-	if err != nil {
-		l.WarnCtx(ctx, "", zap.String("", fmt.Sprintf("Error compressing request body:%v", err)))
-		return err
+func (s Services) SendToServerAsync(ctx context.Context, client *http.Client, url string, m []models.Metrics) error {
+	var numJobs = s.options.RateLimit
+	jobs := make(chan models.Metrics, numJobs)
+
+	var wg sync.WaitGroup
+	wg.Add(int(numJobs))
+	for i := 0; i < int(numJobs); i++ {
+		go func(id int) {
+			defer wg.Done()
+			s.l.InfoCtx(ctx, "Starting worker"+fmt.Sprint(id), zap.Int("worker_id", id))
+			s.worker(ctx, client, url, jobs)
+		}(i)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(compressedBody))
-	if err != nil {
-		l.WarnCtx(ctx, "", zap.String("", fmt.Sprintf("Error creating request:%v", err)))
-		return err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("content-encoding", "gzip")
-	req.Header.Set("Accept-Encoding", "gzip")
-	cookie := &http.Cookie{
-		Name:   "Token",
-		Value:  "TEST_TOKEN",
-		MaxAge: 360,
-	}
-	req.AddCookie(cookie)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		l.InfoCtx(ctx, "compressedBody11", zap.String("", fmt.Sprintf("Error sending request:%v", err)))
-		return err
-	}
-
-	if resp.Header.Get("Content-Encoding") == "gzip" {
-		buf, err := decompressReader(ctx, resp.Body, l)
-		if err != nil {
-			l.ErrorCtx(ctx, "compressedBody1", zap.String("", fmt.Sprintf("Error decompressing response body:%v", err)))
-			return err
+	go func() {
+		for _, j := range m {
+			jobs <- j
 		}
-		os.Stdout.Write(buf.Bytes())
-	} else {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			l.ErrorCtx(ctx, "compressedBody2", zap.String("", fmt.Sprintf("Error reading response body:%v", err)))
-			return err
-		}
-		os.Stdout.Write(body)
-	}
+		close(jobs)
+	}()
 
-	fmt.Fprintf(os.Stdout, "\nUrl: %s\nStatus: %d\n", url, resp.StatusCode)
-	defer resp.Body.Close()
-
-	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
-		l.ErrorCtx(ctx, "compressedBody3", zap.String("", fmt.Sprintf("Error discarding response body:%v", err)))
-	}
-
+	wg.Wait()
 	return nil
 }
 
-func compressedBody(ctx context.Context, body []byte, l *logging.ZapLogger) ([]byte, error) {
+func (s Services) SendToServerBatchMetrics(ctx context.Context, client *http.Client, url string, m []models.Metrics) error {
 	var buf bytes.Buffer
-	zw := gzip.NewWriter(&buf)
-	_, err := zw.Write(body)
-	if err != nil {
-		l.FatalCtx(ctx, "compressedBody4", zap.String("", fmt.Sprintf("Error compressing request body:%v", err)))
-		return nil, err
+	enc := json.NewEncoder(&buf)
+	if err := enc.Encode(m); err != nil {
+		s.l.ErrorCtx(ctx, "Error encoding metrics to JSON",
+			zap.Error(err),
+		)
+		return fmt.Errorf("error encoding metrics: %w", err)
 	}
-	err = zw.Close()
+
+	req, err := s.preparingMetrics(ctx, url, buf.Bytes())
 	if err != nil {
-		l.FatalCtx(ctx, "compressedBody5", zap.String("", fmt.Sprintf("gzip close error:%v", err)))
-		return nil, err
+		return err
 	}
-	compressedBody := buf.Bytes()
-	return compressedBody, err
+
+	return s.sendToServer(ctx, client, req)
+}
+func (s Services) SendToServerMetric(ctx context.Context, client *http.Client, url string, model models.Metrics) error {
+	body, err := json.Marshal(model)
+	if err != nil {
+		s.l.ErrorCtx(ctx, "Error encoding metric to JSON",
+			zap.Error(err),
+		)
+		return fmt.Errorf("error encoding metric: %w", err)
+	}
+
+	req, err := s.preparingMetrics(ctx, url, body)
+	if err != nil {
+		return err
+	}
+
+	return s.sendToServer(ctx, client, req)
 }
 
-func decompressReader(ctx context.Context, body io.ReadCloser, l *logging.ZapLogger) (*bytes.Buffer, error) {
-	const maxDecompressedSize = 20 // 20 MB
-
-	gzReader, err := gzip.NewReader(body)
+func (s Services) sendToServer(ctx context.Context, client *http.Client, req *http.Request) error {
+	resp, err := client.Do(req)
 	if err != nil {
-		l.FatalCtx(ctx, "decompressReader", zap.String("", fmt.Sprintf("Error reading response body:%v", err)))
-	}
-	defer gzReader.Close()
-
-	buf := new(bytes.Buffer)
-	writer := bufio.NewWriter(buf)
-
-	_, err = io.CopyN(writer, gzReader, maxDecompressedSize)
-	if err != nil {
-		if err == io.EOF {
-			err = fmt.Errorf("decompressed data exceeds maximum size limit")
-		}
-		l.FatalCtx(ctx, "decompressReader", zap.String("", fmt.Sprintf("Error when copying:%v", err)))
-		return nil, err
+		s.l.ErrorCtx(ctx, "Request sending failed",
+			zap.String("method", req.Method),
+			zap.String("url", req.URL.String()),
+			zap.Error(err),
+		)
+		return fmt.Errorf("request sending error: %w", err)
 	}
 
-	writer.Flush()
-	return buf, nil
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}()
+
+	if err := s.processingResponseServer(ctx, resp); err != nil {
+		s.l.ErrorCtx(ctx, "Response processing failed",
+			zap.Int("status_code", resp.StatusCode),
+			zap.String("status", resp.Status),
+			zap.Error(err),
+		)
+		return fmt.Errorf("response processing error: %w", err)
+	}
+
+	s.l.InfoCtx(ctx, "Metrics batch successfully sent")
+	return nil
 }

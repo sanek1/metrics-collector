@@ -14,6 +14,7 @@ type ServerOptions struct {
 	Restore       bool
 	DBPath        string
 	UseDatabase   bool
+	CryptoKey     string
 }
 
 type DBSettings struct {
@@ -39,12 +40,13 @@ const (
 
 func ParseServerFlags() *ServerOptions {
 	opt := &ServerOptions{}
-	defaultPathDB := "" // initDefaulthPathDB()
+	defaultPathDB := initDefaulthPathDB()
 	flag.StringVar(&opt.FlagRunAddr, "a", ":8080", "address and port to run server")
 	flag.Int64Var(&opt.StoreInterval, "i", defaultStoreInterval, "address and port to run server")
 	flag.StringVar(&opt.Path, "f", defaultFileName, "address and port to run server")
 	flag.BoolVar(&opt.Restore, "r", defaultRestore, "address and port to run server")
 	flag.StringVar(&opt.DBPath, "d", defaultPathDB, "address and port to run server")
+	flag.StringVar(&opt.CryptoKey, "k", "", "key to encrypt/decrypt metrics")
 
 	flag.Parse()
 	if len(flag.Args()) > 0 {
@@ -76,6 +78,10 @@ func ParseServerFlags() *ServerOptions {
 		opt.UseDatabase = true
 	} else {
 		opt.UseDatabase = false
+	}
+
+	if key := os.Getenv("KEY"); key != "" {
+		opt.CryptoKey = key
 	}
 
 	return opt
