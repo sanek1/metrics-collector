@@ -42,6 +42,48 @@ func (ms *MetricsStorage) LoadFromFile(filename string) error {
 	return nil
 }
 
+// func (ms *MetricsStorage) PeriodicallySaveBackUp(ctx context.Context, filename string, restore bool, interval time.Duration) {
+// 	ticker := time.NewTicker(interval)
+// 	go func() {
+// 		for range ticker.C {
+// 			if err := ms.DumpToFile(filename); err != nil {
+// 				log.Printf("Ошибка сохранения метрик: %v", err)
+// 			}
+// 		}
+// 	}()
+// }
+
+// func (ms *MetricsStorage) DumpToFile(filename string) error {
+// 	// Создаем временный файл для атомарной записи
+// 	tmpFile := filename + ".tmp"
+// 	f, err := os.Create(tmpFile)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	// Сериализуем все метрики за одну блокировку
+// 	metrics := ms.GetAllMetrics()
+
+// 	encoder := json.NewEncoder(f)
+// 	if err := encoder.Encode(metrics); err != nil {
+// 		f.Close()
+// 		os.Remove(tmpFile)
+// 		return err
+// 	}
+
+// 	if err := f.Sync(); err != nil {
+// 		f.Close()
+// 		return err
+// 	}
+
+// 	if err := f.Close(); err != nil {
+// 		return err
+// 	}
+
+// 	// Атомарная замена файла
+// 	return os.Rename(tmpFile, filename)
+// }
+
 func (ms *MetricsStorage) PeriodicallySaveBackUp(ctx context.Context, filename string, restore bool, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()

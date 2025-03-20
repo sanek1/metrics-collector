@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"net/http"
+	_ "net/http/pprof"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -61,6 +62,22 @@ func (a *App) Run() error {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	l.InfoCtx(ctx, "Running server", zap.String("address%s", a.options.FlagRunAddr))
-	return server.ListenAndServe()
+	l.InfoCtx(ctx, "Running server"+a.options.FlagRunAddr, zap.String("address%s", a.options.FlagRunAddr))
+
+	err = server.ListenAndServe()
+	if err != nil {
+		l.FatalCtx(ctx, "Failed to start server", zap.Error(err))
+	}
+	//go func() {
+	//http.ListenAndServe("localhost:8080", ctrl.Router())
+	//}()
+	// go func() {
+	// 	err = server.ListenAndServe()
+	// 	if err != nil {
+	// 		l.FatalCtx(ctx, "Failed to start server", zap.Error(err))
+	// 	}
+	// }()
+
+	return nil
+
 }

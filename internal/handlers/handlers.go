@@ -90,8 +90,8 @@ func (s Storage) MetricHandler(rw http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	models, err := s.handlerServices.ParseMetricsServices(rw, r)
 	if err != nil {
-		s.Logger.ErrorCtx(ctx, "The metric was not parsed", zap.Any("err", err.Error()))
-		SendResultStatusNotOK(rw, []byte(`{"error": "failed to read body"}`))
+		s.Logger.ErrorCtx(ctx, "The metric was not parsed")
+		SendResultStatusNotOK(rw, err )
 		return
 	}
 	s.handlerServices.models = &models
@@ -111,7 +111,12 @@ func (s Storage) SaveToFile(fname string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(fname, data, fileMode)
+	go func() {
+		if err := os.WriteFile(fname, data, fileMode); err != nil {
+			s.Logger.ErrorCtx(context.Background(), "Async save failed", zap.Any("err", err.Error()))
+		}
+	}()
+	return nil
 }
 
 func (s Storage) PingDBHandler(rw http.ResponseWriter, r *http.Request) {
@@ -128,3 +133,27 @@ func NotImplementedHandler(rw http.ResponseWriter, r *http.Request) {
 func BadRequestHandler(rw http.ResponseWriter, r *http.Request) {
 	http.Error(rw, "Bad Request Handler", http.StatusBadRequest)
 }
+
+// func BuildMetricByChiParam(r *http.Request) (*store.Metric, error) {
+// 	metric := &store.Metric{}
+// 	metric.MType = chi.URLParam(r, "metricType")
+// 	metric.ID = chi.URLParam(r, "metricName")
+// 	v := chi.URLParam(r, "metricValue")
+// 	if metric.MType == store.MTypeCounter {
+// 		delta, err := strconv.ParseInt(v, 10, 64)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		metric.Delta = &delta
+// 	} else if metric.MType == store.MTypeGauge {
+// 		value, err := strconv.ParseFloat(v, 64)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		metric.Value = &value
+// 	} else {
+// 		return nil, errors.New("unknown type")
+// 	}
+
+// 	return metric, nil
+// }

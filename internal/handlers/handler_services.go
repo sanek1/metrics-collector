@@ -146,14 +146,8 @@ func SendResultStatusOK(rw http.ResponseWriter, resp []byte) {
 	}
 }
 
-func SendResultStatusNotOK(rw http.ResponseWriter, resp []byte) {
-	rw.WriteHeader(http.StatusBadRequest)
-	rw.Header().Set("Content-Type", "application/json")
-	_, err := rw.Write(resp)
-	if err != nil {
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
-		return
-	}
+func SendResultStatusNotOK(rw http.ResponseWriter, err error) {
+	http.Error(rw, err.Error(), http.StatusBadRequest)
 }
 
 func (s *Services) buildJSONBody(rw http.ResponseWriter, r *http.Request) (err error) {
