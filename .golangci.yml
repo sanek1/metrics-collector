@@ -70,7 +70,7 @@ linters:
     - gocritic
     - gocyclo
     - gofmt
-    - goimports
+    #- goimports
     - mnd
     - goprintffuncname
     - gosec

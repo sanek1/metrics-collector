@@ -25,7 +25,7 @@ func startDBConnection(ctx context.Context, opt *flags.ServerOptions) (*pgxpool.
 }
 
 func FilterBatchesBeforeSaving(metrics []m.Metrics) []m.Metrics {
-	seen := make(map[string]m.Metrics)
+	seen := make(map[string]m.Metrics, len(metrics))
 	for _, model := range metrics {
 		key := model.ID + ":" + model.MType
 		if existingMetric, ok := seen[key]; ok {
@@ -53,25 +53,23 @@ func FilterBatchesBeforeSaving(metrics []m.Metrics) []m.Metrics {
 }
 
 func SortingBatchData(existingMetrics []*m.Metrics, metrics []m.Metrics) (updatingBatch, insertingBatch []m.Metrics) {
-	updatingBatch = make([]m.Metrics, 0, len(existingMetrics))
-	insertingBatch = make([]m.Metrics, 0, len(metrics)-len(existingMetrics))
+	exists := make(map[string]struct{}, len(existingMetrics))
+	for _, m := range existingMetrics {
+		exists[m.ID+":"+m.MType] = struct{}{}
+	}
+
+	updatingBatch = make([]m.Metrics, 0, len(metrics))
+	insertingBatch = make([]m.Metrics, 0, len(metrics))
 
 	for _, m := range metrics {
-		found := false
-		for _, r := range existingMetrics {
-			if m.ID == r.ID && m.MType == r.MType {
-				found = true
-				break
-			}
-		}
-
-		if found {
+		key := m.ID + ":" + m.MType
+		if _, ok := exists[key]; ok {
 			updatingBatch = append(updatingBatch, m)
 		} else {
 			insertingBatch = append(insertingBatch, m)
 		}
 	}
-	return updatingBatch, insertingBatch
+	return
 }
 
 func CollectorQuery(ctx context.Context, metrics []m.Metrics) (query string, mTypes []string, args []interface{}) {
@@ -181,9 +179,14 @@ func (s *DBStorage) getMetricsOnDBs(ctx context.Context, metrics ...m.Metrics) (
 
 func (s *DBStorage) setMetrics(ctx context.Context, models ...m.Metrics) ([]*m.Metrics, error) {
 	// filter duplicates and batches before saving
-	models = FilterBatchesBeforeSaving(models)
+	filtered := FilterBatchesBeforeSaving(models)
+	tx, err := s.conn.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("transaction begin failed: %w", err)
+	}
+	defer tx.Rollback(ctx)
 
-	existingMetrics, err := s.getMetricsOnDBs(ctx, models...)
+	existingMetrics, err := s.getMetricsOnDBs(ctx, filtered...)
 	if err != nil {
 		return nil, err
 	}
@@ -202,10 +205,13 @@ func (s *DBStorage) setMetrics(ctx context.Context, models ...m.Metrics) ([]*m.M
 			return nil, err
 		}
 	}
-
-	metrics, err := s.getMetricsOnDBs(ctx, models...)
-	if err != nil {
-		return nil, err
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("transaction commit failed: %w", err)
 	}
-	return metrics, nil
+
+	result := make([]*m.Metrics, 0, len(filtered))
+	for _, m := range filtered {
+		result = append(result, &m)
+	}
+	return result, nil
 }
