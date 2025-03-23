@@ -22,6 +22,15 @@ type Services struct {
 	logger *l.ZapLogger
 }
 
+type HServices interface {
+	PingService(c *gin.Context)
+	CounterService(c *gin.Context)
+	GaugeService(c *gin.Context)
+	HistogramService(c *gin.Context)
+	MetricsService(c *gin.Context, models ...*m.Metrics)
+}
+
+
 func NewHandlerServices(st storage.Storage, models *[]m.Metrics, zl *l.ZapLogger) *Services {
 	return &Services{
 		s:      st,

@@ -22,6 +22,9 @@ type Router struct {
 	s              *h.Storage
 	opt            *sf.ServerOptions
 }
+type Routing interface {
+	InitRouting() http.Handler
+}
 
 func NewRouting(s ss.Storage, opt *sf.ServerOptions, logger *l.ZapLogger) *Router {
 	c := &Router{
