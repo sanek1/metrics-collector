@@ -1,6 +1,6 @@
 module github.com/sanek1/metrics-collector
 
-go 1.22.0
+go 1.22.0 
 
 require (
 	github.com/gin-contrib/gzip v1.2.2
