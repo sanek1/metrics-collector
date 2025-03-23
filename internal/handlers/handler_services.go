@@ -2,15 +2,14 @@ package handlers
 
 import (
 	"bytes"
-	con "context"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 
-	c "github.com/sanek1/metrics-collector/internal/config"
+	"github.com/gin-gonic/gin"
 	m "github.com/sanek1/metrics-collector/internal/models"
 	storage "github.com/sanek1/metrics-collector/internal/storage/server"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
@@ -31,69 +30,58 @@ func NewHandlerServices(st storage.Storage, models *[]m.Metrics, zl *l.ZapLogger
 	}
 }
 
-func (s *Services) PingService(ctx con.Context, rw http.ResponseWriter) {
+func (s *Services) PingService(c *gin.Context) {
 	if dbs, ok := s.s.(storage.DatabaseStorage); ok {
 		if !dbs.PingIsOk() {
-			SendResultStatusNotOK(rw, nil)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Database connection failed"})
 			return
 		}
 	}
-	SendResultStatusOK(rw, nil)
+	c.JSON(http.StatusOK, gin.H{})
 }
 
-func (s *Services) CounterService(ctx con.Context, rw http.ResponseWriter) {
+func (s *Services) CounterService(c *gin.Context) {
 	models := *s.models
-	updatedModels, err := s.s.SetCounter(ctx, models...)
+	updatedModels, err := s.s.SetCounter(c.Request.Context(), models...)
 	if err != nil {
-		s.logger.ErrorCtx(ctx, "The metric counter was not saved", zap.Any("err", err.Error()))
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		s.logger.ErrorCtx(c.Request.Context(), "The metric counter was not saved", zap.Any("err", err.Error()))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	s.MetricsService(ctx, rw, updatedModels...)
+	s.MetricsService(c, updatedModels...)
 }
 
-func (s *Services) GaugeService(ctx con.Context, rw http.ResponseWriter) {
+func (s *Services) GaugeService(c *gin.Context) {
 	models := *s.models
-	updatedModels, err := s.s.SetGauge(ctx, models...)
+	updatedModels, err := s.s.SetGauge(c.Request.Context(), models...)
 	if err != nil {
-		s.logger.ErrorCtx(ctx, "One or more metrics were not saved", zap.Any("err", err.Error()))
-		http.Error(rw, "One or more metrics were not saved", http.StatusInternalServerError)
+		s.logger.ErrorCtx(c.Request.Context(), "One or more metrics were not saved", zap.Any("err", err.Error()))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "One or more metrics were not saved"})
 		return
 	}
 	if len(updatedModels) == 1 {
 		res := updatedModels[0]
-		s.MetricsService(ctx, rw, res)
+		s.MetricsService(c, res)
 		return
 	}
-	s.MetricsService(ctx, rw, updatedModels...)
+	s.MetricsService(c, updatedModels...)
 }
 
-func (s *Services) MetricsService(ctx con.Context, rw http.ResponseWriter, models ...*m.Metrics) {
+func (s *Services) MetricsService(c *gin.Context, models ...*m.Metrics) {
 	if len(models) == 1 {
 		model := models[0]
-		resp, err := json.Marshal(model)
-		if err != nil {
-			s.logger.ErrorCtx(ctx, "The metric was not marshaled", zap.Any("err", err.Error()))
-			http.Error(rw, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		SendResultStatusOK(rw, resp)
+		c.JSON(http.StatusOK, model)
 		return
 	}
-
-	resp, err := json.Marshal(models)
-	if err != nil {
-		s.logger.ErrorCtx(ctx, "The metric was not marshaled", zap.Any("err", err.Error()))
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	SendResultStatusOK(rw, resp)
+	c.JSON(http.StatusOK, models)
 }
 
-func (s *Services) ParseMetricsServices(rw http.ResponseWriter, r *http.Request) ([]m.Metrics, error) {
+func (s *Services) ParseMetricsServices(c *gin.Context) ([]m.Metrics, error) {
 	var models []m.Metrics
+	r := c.Request
+
 	if r.ContentLength == 0 {
-		if err := s.buildJSONBody(rw, r); err != nil {
+		if err := s.buildJSONBody(c); err != nil {
 			s.logger.ErrorCtx(r.Context(), "The metric was not parsed", zap.Any("err", err.Error()))
 			return nil, fmt.Errorf("buildJSONBody: %w", err)
 		}
@@ -104,11 +92,24 @@ func (s *Services) ParseMetricsServices(rw http.ResponseWriter, r *http.Request)
 		s.logger.ErrorCtx(r.Context(), "The metric was not read", zap.Any("err", err.Error()))
 		return nil, fmt.Errorf("read body: %w", err)
 	}
+	if c.GetHeader("Content-Encoding") == "gzip" {
+		reader, err := gzip.NewReader(bytes.NewReader(bodyBytes))
+		if err != nil {
+			s.logger.ErrorCtx(r.Context(), "Failed to decompress gzip data", zap.Error(err))
+			return nil, fmt.Errorf("gzip decompression: %w", err)
+		}
+		decompressed, err := io.ReadAll(reader)
+		if err != nil {
+			s.logger.ErrorCtx(r.Context(), "Failed to read decompressed data", zap.Error(err))
+			return nil, fmt.Errorf("read decompressed: %w", err)
+		}
+		bodyBytes = decompressed
+	}
 
 	var model m.Metrics
 	if err := json.Unmarshal(bodyBytes, &model); err != nil {
 		if err := json.Unmarshal(bodyBytes, &models); err != nil {
-			s.logger.ErrorCtx(r.Context(), "The metric was not parsed", zap.Any("err", err.Error()))
+			s.logger.ErrorCtx(r.Context(), "The metric was not parsed"+string(bodyBytes)+err.Error(), zap.Any("err", err.Error()))
 			return nil, fmt.Errorf("unmarshal: %w", err)
 		}
 	}
@@ -125,6 +126,89 @@ func (s *Services) ParseMetricsServices(rw http.ResponseWriter, r *http.Request)
 		}
 	}
 	return models, nil
+}
+func (s *Services) GetMetricsByValueGin(c *gin.Context) {
+	bodyBytes, err := c.GetRawData()
+	if err != nil {
+		s.logger.ErrorCtx(c.Request.Context(), "Failed to read request body", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Failed to read request body",
+		})
+		return
+	}
+	c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	var requestMetric m.Metrics
+	if err := json.Unmarshal(bodyBytes, &requestMetric); err != nil {
+		s.logger.ErrorCtx(c.Request.Context(), "Failed to parse metric request",
+			zap.Error(err),
+			zap.String("body", string(bodyBytes)))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid metric request format",
+		})
+		return
+	}
+
+	if requestMetric.ID == "" || requestMetric.MType == "" {
+		s.logger.WarnCtx(c.Request.Context(), "Missing metric ID or type in request",
+			zap.String("id", requestMetric.ID),
+			zap.String("type", requestMetric.MType))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Metric ID and type are required",
+		})
+		return
+	}
+
+	s.logger.InfoCtx(c.Request.Context(), "Getting metric value",
+		zap.String("id", requestMetric.ID),
+		zap.String("type", requestMetric.MType))
+
+	metric, found := s.s.GetMetrics(c.Request.Context(), requestMetric.MType, requestMetric.ID)
+	if !found {
+		s.logger.WarnCtx(c.Request.Context(), "Metric not found",
+			zap.String("id", requestMetric.ID),
+			zap.String("type", requestMetric.MType))
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Metric not found",
+		})
+		return
+	}
+
+	s.logger.InfoCtx(c.Request.Context(), "Metric found, returning value",
+		zap.String("id", metric.ID),
+		zap.String("type", metric.MType))
+
+	c.JSON(http.StatusOK, metric)
+}
+
+func (s *Services) buildJSONBody(c *gin.Context) (err error) {
+	metricType := c.Param("metricType")
+	metricName := c.Param("metricName")
+	metricValue, err := strconv.ParseFloat(c.Param("metricValue"), 64)
+	if err != nil {
+		s.logger.ErrorCtx(c.Request.Context(), "Failed to parse metric value", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": "The value does not match the expected type."})
+		return err
+	}
+
+	intVal := int64(metricValue)
+	model := m.Metrics{
+		ID:    metricName,
+		MType: metricType,
+		Delta: &intVal,
+		Value: &metricValue,
+	}
+
+	models := []m.Metrics{model}
+	resp, err := json.Marshal(models)
+
+	if err != nil {
+		s.logger.ErrorCtx(c.Request.Context(), "Marshaling error", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return err
+	}
+	c.Request.Body = io.NopCloser(bytes.NewReader(resp))
+	return nil
 }
 
 func GenerateHTMLServices(metrics []string) string {
@@ -148,36 +232,4 @@ func SendResultStatusOK(rw http.ResponseWriter, resp []byte) {
 
 func SendResultStatusNotOK(rw http.ResponseWriter, err error) {
 	http.Error(rw, err.Error(), http.StatusBadRequest)
-}
-
-func (s *Services) buildJSONBody(rw http.ResponseWriter, r *http.Request) (err error) {
-	key, name, val, err := readingDataFromURL(r)
-	if err != nil {
-		http.Error(rw, "The value does not match the expected type.", http.StatusBadRequest)
-		return err
-	}
-	intVal := int64(*val)
-	model := m.Metrics{
-		ID:    name,
-		MType: key,
-		Delta: &intVal,
-		Value: val,
-	}
-	models := []m.Metrics{model}
-	resp, err := json.Marshal(models)
-	if err != nil {
-		fmt.Println("marshaling error")
-		http.Error(rw, err.Error(), http.StatusBadRequest)
-		return err
-	}
-	r.Body = io.NopCloser(bytes.NewReader(resp))
-	return nil
-}
-
-func readingDataFromURL(r *http.Request) (key, name string, value *float64, err error) {
-	splitedPath := strings.Split(r.URL.Path, "/")
-	metrickType := splitedPath[c.TypeMetric]
-	metrickName := splitedPath[c.MetricName]
-	metricValue, err := strconv.ParseFloat(splitedPath[c.MetricVal], 64)
-	return metrickType, metrickName, &metricValue, err
 }

@@ -3,15 +3,15 @@ package app
 import (
 	"context"
 	"net/http"
-	_ "net/http/pprof"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"go.uber.org/zap"
+
 	sc "github.com/sanek1/metrics-collector/internal/controller/server"
 	sf "github.com/sanek1/metrics-collector/internal/flags/server"
 	ss "github.com/sanek1/metrics-collector/internal/storage/server"
 	"github.com/sanek1/metrics-collector/pkg/logging"
-	"go.uber.org/zap"
 )
 
 type App struct {
@@ -68,16 +68,5 @@ func (a *App) Run() error {
 	if err != nil {
 		l.FatalCtx(ctx, "Failed to start server", zap.Error(err))
 	}
-	//go func() {
-	//http.ListenAndServe("localhost:8080", ctrl.Router())
-	//}()
-	// go func() {
-	// 	err = server.ListenAndServe()
-	// 	if err != nil {
-	// 		l.FatalCtx(ctx, "Failed to start server", zap.Error(err))
-	// 	}
-	// }()
-
 	return nil
-
 }

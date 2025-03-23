@@ -9,10 +9,11 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.uber.org/zap"
+
 	flags "github.com/sanek1/metrics-collector/internal/flags/server"
 	m "github.com/sanek1/metrics-collector/internal/models"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
-	"go.uber.org/zap"
 )
 
 type DBStorage struct {

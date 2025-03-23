@@ -4,12 +4,13 @@ import (
 	"context"
 	"testing"
 
-	flags "github.com/sanek1/metrics-collector/internal/flags/server"
-	m "github.com/sanek1/metrics-collector/internal/models"
-	l "github.com/sanek1/metrics-collector/pkg/logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+
+	flags "github.com/sanek1/metrics-collector/internal/flags/server"
+	m "github.com/sanek1/metrics-collector/internal/models"
+	l "github.com/sanek1/metrics-collector/pkg/logging"
 )
 
 func TestInsertUpdateMultipleMetricsInBatch(t *testing.T) {
@@ -41,7 +42,6 @@ func TestInsertUpdateMultipleMetricsInBatch(t *testing.T) {
 	models := FilterBatchesBeforeSaving(testMetrics)
 
 	existingMetrics, _ := storage.getMetricsOnDBs(ctx, models...)
-	// filter duplicates and sort before updating/inserting
 	updatingBatch, insertingBatch := SortingBatchData(existingMetrics, models)
 
 	if len(updatingBatch) != 0 {
@@ -57,13 +57,11 @@ func TestInsertUpdateMultipleMetricsInBatch(t *testing.T) {
 		}
 	}
 
-	// Verify metrics are inserted correctly
 	metricMap := make(map[string]m.Metrics)
 	for _, metric := range models {
 		metricMap[metric.ID] = metric
 	}
 
-	// Verify metrics are inserted correctly
 	metricMapBefore := make(map[string]m.Metrics)
 	for _, metric := range existingMetrics {
 		metricMapBefore[metric.ID] = *metric

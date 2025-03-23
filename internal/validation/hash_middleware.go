@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"io"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 type Secret struct {
@@ -18,25 +20,34 @@ func NewHash(key string) *Secret {
 	}
 }
 
-func (s *Secret) HashMiddleware(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
+func (s *Secret) HashMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		body, err := c.GetRawData()
 		if err != nil {
-			http.Error(w, "Unable to read request body", http.StatusBadRequest)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Unable to read request body",
+			})
+			c.Abort()
 			return
 		}
-
-		r.Body.Close()
-		r.Body = io.NopCloser(bytes.NewBuffer(body))
-		datatoHash := string(body) + s.SecretKey
-
+		c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
+		dataToHash := string(body) + s.SecretKey
 		hash := sha256.New()
-		hash.Write([]byte(datatoHash))
+		hash.Write([]byte(dataToHash))
 		hashSum := hash.Sum(nil)
-
 		hashHex := hex.EncodeToString(hashSum)
-		w.Header().Set("HashSHA256", hashHex)
+		c.Header("HashSHA256", hashHex)
+		c.Next()
+	}
+}
 
-		h.ServeHTTP(w, r)
-	})
+func (s *Secret) VerifyHash(body []byte, providedHash string) bool {
+	dataToHash := string(body) + s.SecretKey
+
+	hash := sha256.New()
+	hash.Write([]byte(dataToHash))
+	hashSum := hash.Sum(nil)
+
+	hashHex := hex.EncodeToString(hashSum)
+	return hashHex == providedHash
 }

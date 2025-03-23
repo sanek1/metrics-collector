@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 
+	"go.uber.org/zap"
+
 	flags "github.com/sanek1/metrics-collector/internal/flags/server"
 	m "github.com/sanek1/metrics-collector/internal/models"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
-	"go.uber.org/zap"
 )
 
 func (ms *MetricsStorage) SetLog(ctx context.Context, model *m.Metrics) {

@@ -3,32 +3,34 @@ package main
 import (
 	"log"
 	"net/http"
-	_ "net/http/pprof"
+	"time"
 
 	app "github.com/sanek1/metrics-collector/internal/app/server"
 	flags "github.com/sanek1/metrics-collector/internal/flags/server"
 )
 
+const (
+	readTimeout  = 5 * time.Second
+	writeTimeout = 10 * time.Second
+	idleTimeout  = 15 * time.Second
+)
+
 func main() {
 	go func() {
-		http.ListenAndServe("localhost:6060", nil)
+		server := &http.Server{
+			Addr:         "localhost:6060",
+			Handler:      nil,
+			ReadTimeout:  readTimeout,
+			WriteTimeout: writeTimeout,
+			IdleTimeout:  idleTimeout,
+		}
+		err := server.ListenAndServe()
+		if err != nil {
+			log.Fatal(err)
+		}
 	}()
-	// Открываем файл для записи профиля
-	//f, err := os.Create("../../profiles/cpu.pprof")
-	//if err != nil {
-	//	panic(err)
-	//}
-	//defer f.Close()
-
-	// Начать профилирование CPU
-	//if err := pprof.StartCPUProfile(f); err != nil {
-	//	panic(err)
-	//}
-	//defer pprof.StopCPUProfile()
-
 	opt := flags.ParseServerFlags()
 	if err := app.New(opt, opt.UseDatabase).Run(); err != nil {
 		log.Fatal(err)
 	}
-
 }

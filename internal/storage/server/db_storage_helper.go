@@ -53,23 +53,25 @@ func FilterBatchesBeforeSaving(metrics []m.Metrics) []m.Metrics {
 }
 
 func SortingBatchData(existingMetrics []*m.Metrics, metrics []m.Metrics) (updatingBatch, insertingBatch []m.Metrics) {
-	exists := make(map[string]struct{}, len(existingMetrics))
-	for _, m := range existingMetrics {
-		exists[m.ID+":"+m.MType] = struct{}{}
-	}
-
-	updatingBatch = make([]m.Metrics, 0, len(metrics))
-	insertingBatch = make([]m.Metrics, 0, len(metrics))
+	updatingBatch = make([]m.Metrics, 0, len(existingMetrics))
+	insertingBatch = make([]m.Metrics, 0, len(metrics)-len(existingMetrics))
 
 	for _, m := range metrics {
-		key := m.ID + ":" + m.MType
-		if _, ok := exists[key]; ok {
+		found := false
+		for _, r := range existingMetrics {
+			if m.ID == r.ID && m.MType == r.MType {
+				found = true
+				break
+			}
+		}
+
+		if found {
 			updatingBatch = append(updatingBatch, m)
 		} else {
 			insertingBatch = append(insertingBatch, m)
 		}
 	}
-	return
+	return updatingBatch, insertingBatch
 }
 
 func CollectorQuery(ctx context.Context, metrics []m.Metrics) (query string, mTypes []string, args []interface{}) {
@@ -99,11 +101,9 @@ func (s *DBStorage) updateMetrics(ctx context.Context, models []m.Metrics) error
 		}
 	}
 
-	// Execute batch query
 	br := s.conn.SendBatch(ctx, batch)
 	defer br.Close()
 
-	// Commit or rollback transaction
 	var err error
 	if _, err := br.Exec(); err != nil {
 		s.Logger.ErrorCtx(ctx, "failed to execute batch request:  %w"+err.Error(), zap.Error(err))
@@ -178,19 +178,12 @@ func (s *DBStorage) getMetricsOnDBs(ctx context.Context, metrics ...m.Metrics) (
 }
 
 func (s *DBStorage) setMetrics(ctx context.Context, models ...m.Metrics) ([]*m.Metrics, error) {
-	// filter duplicates and batches before saving
-	filtered := FilterBatchesBeforeSaving(models)
-	tx, err := s.conn.Begin(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("transaction begin failed: %w", err)
-	}
-	defer tx.Rollback(ctx)
+	models = FilterBatchesBeforeSaving(models)
 
-	existingMetrics, err := s.getMetricsOnDBs(ctx, filtered...)
+	existingMetrics, err := s.getMetricsOnDBs(ctx, models...)
 	if err != nil {
 		return nil, err
 	}
-	// filter duplicates and sort before updating/inserting
 	updatingBatch, insertingBatch := SortingBatchData(existingMetrics, models)
 
 	if len(updatingBatch) != 0 {
@@ -205,13 +198,10 @@ func (s *DBStorage) setMetrics(ctx context.Context, models ...m.Metrics) ([]*m.M
 			return nil, err
 		}
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("transaction commit failed: %w", err)
-	}
 
-	result := make([]*m.Metrics, 0, len(filtered))
-	for _, m := range filtered {
-		result = append(result, &m)
+	metrics, err := s.getMetricsOnDBs(ctx, models...)
+	if err != nil {
+		return nil, err
 	}
-	return result, nil
+	return metrics, nil
 }

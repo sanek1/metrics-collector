@@ -1,9 +1,11 @@
 package routing
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
 
-	"github.com/go-chi/chi"
+	"github.com/gin-gonic/gin"
 	sf "github.com/sanek1/metrics-collector/internal/flags/server"
 	h "github.com/sanek1/metrics-collector/internal/handlers"
 	ss "github.com/sanek1/metrics-collector/internal/storage/server"
@@ -11,8 +13,8 @@ import (
 	l "github.com/sanek1/metrics-collector/pkg/logging"
 )
 
-type Controller struct {
-	r              chi.Router
+type Router struct {
+	router         *gin.Engine
 	l              *l.ZapLogger
 	middleware     *v.MiddlewareController
 	middlewareHash *v.Secret
@@ -21,10 +23,10 @@ type Controller struct {
 	opt            *sf.ServerOptions
 }
 
-func NewRouting(s ss.Storage, opt *sf.ServerOptions, logger *l.ZapLogger) *Controller {
-	c := &Controller{
+func NewRouting(s ss.Storage, opt *sf.ServerOptions, logger *l.ZapLogger) *Router {
+	c := &Router{
 		l:       logger,
-		r:       chi.NewRouter(),
+		router:  gin.Default(),
 		storage: s,
 		opt:     opt,
 	}
@@ -35,71 +37,66 @@ func NewRouting(s ss.Storage, opt *sf.ServerOptions, logger *l.ZapLogger) *Contr
 	return c
 }
 
-func (c *Controller) InitRouting() http.Handler {
-	r := chi.NewRouter()
-	r.Use(c.middleware.Recover)
-	if c.opt.CryptoKey != "" {
-		r.Use(c.middlewareHash.HashMiddleware)
+func (r *Router) InitRouting() http.Handler {
+	if r.opt.CryptoKey != "" {
+		r.router.Use(r.middlewareHash.HashMiddleware())
 	}
-	r.Mount("/debug/", http.DefaultServeMux)
 
-	r.Group(func(r chi.Router) {
-		// Применяем GZIP только к API-маршрутам, где это имеет смысл
-		r.Use(v.OptimizedGzipMiddleware)
+	r.router.Use(v.GzipMiddleware())
+	r.router.Use(func(c *gin.Context) {
+		if c.Request.Method == "POST" && c.FullPath() == "/update/:metricType/:metricName/:metricValue" {
+			metricType := c.Param("metricType")
+			metricValue := c.Param("metricValue")
 
-		// Маршруты для получения значений метрик - с большой вероятностью JSON ответы
-		r.Post("/value/*", http.HandlerFunc(c.s.GetMetricsByValueHandler))
-		r.Post("/updates/", http.HandlerFunc(c.s.MetricHandler))
-		r.Get("/{value}/{type}/*", http.HandlerFunc(c.s.GetMetricsByNameHandler))
+			if metricType != "counter" && metricType != "gauge" {
+				c.AbortWithStatus(http.StatusBadRequest)
+				return
+			}
+			if metricType == "counter" {
+				if _, err := parseCounterValue(metricValue); err != nil {
+					c.AbortWithStatus(http.StatusBadRequest)
+					return
+				}
+			}
+			if metricType == "gauge" {
+				if _, err := parseGaugeValue(metricValue); err != nil {
+					c.AbortWithStatus(http.StatusBadRequest)
+					return
+				}
+			}
+		}
 
-		// Маршруты для обновления метрик - тоже JSON
-		r.Route("/update", func(r chi.Router) {
-			// Для обновления метрик сначала валидируем, потом обрабатываем
-			r.Post("/*", http.HandlerFunc(c.s.MetricHandler))
-			//r.Post("/gauge/*", c.middleware.OptimizedValidation(c.s.MetricHandler))
-			//r.Post("/counter/*", c.middleware.OptimizedValidation(http.HandlerFunc(c.s.MetricHandler)))
-
-			r.Post("/gauge/*", func(w http.ResponseWriter, r *http.Request) {
-				c.middleware.OptimizedValidation(http.HandlerFunc(c.s.MetricHandler)).ServeHTTP(w, r)
-			})
-			r.Post("/counter/*", func(w http.ResponseWriter, r *http.Request) {
-				c.middleware.OptimizedValidation(http.HandlerFunc(c.s.MetricHandler)).ServeHTTP(w, r)
-			})
-		})
+		c.Next()
 	})
 
-	r.Group(func(r chi.Router) {
-		// Здесь не используем сжатие, т.к. ответы обычно маленькие
-		r.Get("/ping/", http.HandlerFunc(c.s.PingDBHandler))
-	})
-	r.Group(func(r chi.Router) {
-		// Главная страница - обычно HTML
-		r.Get("/*", c.middleware.CheckForPingMiddleware(http.HandlerFunc(c.s.MainPageHandler)))
-	})
-	r.Group(func(r chi.Router) {
-		// Для этих маршрутов валидируем, но не сжимаем ответы
-		r.Use(c.middleware.OptimizedValidation)
-		r.Post("/*", http.HandlerFunc(h.NotImplementedHandler))
-	})
+	r.router.POST("/update/:metricType/:metricName/:metricValue", r.s.MetricHandler)
+	r.router.POST("/updates/", r.s.MetricHandler)
+	r.router.POST("/update/", r.s.MetricHandler)
+	r.router.POST("/value/", r.s.GetMetricsByValueHandler)
+	r.router.POST("/", gin.WrapF(h.NotImplementedHandler))
+	r.router.GET("/", r.s.MainPageHandler)
+	r.router.GET("/ping", r.s.PingDBHandler)
+	r.router.GET("/:metricValue/:metricType/:metricName", r.s.GetMetricsByNameHandler)
+	r.router.NoRoute(gin.WrapF(h.NotImplementedHandler))
+	return r.router
+}
 
-	// r.Route("/", func(r chi.Router) {
-	// 	// Get routes
-	// 	r.Get("/*", c.middleware.CheckForPingMiddleware(http.HandlerFunc(c.s.MainPageHandler)))
-	// 	r.Get("/ping/", http.HandlerFunc(c.s.PingDBHandler))
-	// 	r.Get("/{value}/{type}/*", http.HandlerFunc(c.s.GetMetricsByNameHandler))
-	// 	//r.Get("/debug/*", nil)
+func parseCounterValue(value string) (int64, error) {
+	intValue, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid counter value: %w", err)
+	}
 
-	// 	// Post routes
-	// 	r.Post("/*", c.middleware.ValidationOld(http.HandlerFunc(h.NotImplementedHandler)))
-	// 	r.Post("/value/*", http.HandlerFunc(c.s.GetMetricsByValueHandler))
-	// 	r.Post("/updates/", http.HandlerFunc(c.s.MetricHandler))
+	if intValue < 0 {
+		return 0, fmt.Errorf("counter value must be non-negative")
+	}
+	return intValue, nil
+}
 
-	// 	r.Route("/update", func(r chi.Router) {
-	// 		r.Post("/*", http.HandlerFunc(c.s.MetricHandler))
-	// 		r.Post("/gauge/*", c.middleware.ValidationOld(http.HandlerFunc(c.s.MetricHandler)))
-	// 		r.Post("/counter/*", c.middleware.ValidationOld(http.HandlerFunc(c.s.MetricHandler)))
-	// 	})
-	// })
-
-	return r
+func parseGaugeValue(value string) (float64, error) {
+	floatValue, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid gauge value: %w", err)
+	}
+	return floatValue, nil
 }
