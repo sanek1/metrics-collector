@@ -30,7 +30,6 @@ type HServices interface {
 	MetricsService(c *gin.Context, models ...*m.Metrics)
 }
 
-
 func NewHandlerServices(st storage.Storage, models *[]m.Metrics, zl *l.ZapLogger) *Services {
 	return &Services{
 		s:      st,
