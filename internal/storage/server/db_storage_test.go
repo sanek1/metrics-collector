@@ -5,11 +5,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	flags "github.com/sanek1/metrics-collector/internal/flags/server"
 	m "github.com/sanek1/metrics-collector/internal/models"
+	"github.com/sanek1/metrics-collector/internal/storage/server/mocks"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
 )
 
@@ -88,4 +90,88 @@ func TestInsertUpdateMultipleMetricsInBatch(t *testing.T) {
 		}
 		assert.Equal(t, expectedMetric.Value, retrievedMetric.Value)
 	}
+}
+
+func TestStorageWithMocks(t *testing.T) {
+	mockStorage := mocks.NewStorage(t)
+	ctx := context.Background()
+	value := float64(123.45)
+	gaugeMetric := m.Metrics{
+		ID:    "TestGauge",
+		MType: "gauge",
+		Value: &value,
+	}
+
+	resultGaugeMetric := &m.Metrics{
+		ID:    "TestGauge",
+		MType: "gauge",
+		Value: &value,
+	}
+
+	mockStorage.On("SetGauge", mock.Anything, mock.Anything).Return([]*m.Metrics{resultGaugeMetric}, nil)
+	mockStorage.On("GetMetrics", mock.Anything, "gauge", "TestGauge").Return(resultGaugeMetric, true)
+
+	delta := int64(42)
+	counterMetric := m.Metrics{
+		ID:    "TestCounter",
+		MType: "counter",
+		Delta: &delta,
+	}
+
+	resultCounterMetric := &m.Metrics{
+		ID:    "TestCounter",
+		MType: "counter",
+		Delta: &delta,
+	}
+
+	mockStorage.On("SetCounter", mock.Anything, mock.Anything).Return([]*m.Metrics{resultCounterMetric}, nil)
+	mockStorage.On("GetMetrics", mock.Anything, "counter", "TestCounter").Return(resultCounterMetric, true)
+
+	mockStorage.On("GetAllMetrics").Return([]string{
+		"gauge:TestGauge=123.45",
+		"counter:TestCounter=42",
+	})
+
+	t.Run("SetGauge", func(t *testing.T) {
+		updatedMetrics, err := mockStorage.SetGauge(ctx, gaugeMetric)
+		require.NoError(t, err)
+		require.Len(t, updatedMetrics, 1)
+		assert.Equal(t, "TestGauge", updatedMetrics[0].ID)
+		assert.Equal(t, "gauge", updatedMetrics[0].MType)
+		assert.Equal(t, value, *updatedMetrics[0].Value)
+	})
+
+	t.Run("GetGaugeMetric", func(t *testing.T) {
+		metric, found := mockStorage.GetMetrics(ctx, "gauge", "TestGauge")
+		assert.True(t, found)
+		assert.Equal(t, "TestGauge", metric.ID)
+		assert.Equal(t, "gauge", metric.MType)
+		assert.Equal(t, value, *metric.Value)
+	})
+
+	t.Run("SetCounter", func(t *testing.T) {
+		updatedMetrics, err := mockStorage.SetCounter(ctx, counterMetric)
+		require.NoError(t, err)
+		require.Len(t, updatedMetrics, 1)
+		assert.Equal(t, "TestCounter", updatedMetrics[0].ID)
+		assert.Equal(t, "counter", updatedMetrics[0].MType)
+		assert.Equal(t, delta, *updatedMetrics[0].Delta)
+	})
+
+	t.Run("GetCounterMetric", func(t *testing.T) {
+		metric, found := mockStorage.GetMetrics(ctx, "counter", "TestCounter")
+		assert.True(t, found)
+		assert.Equal(t, "TestCounter", metric.ID)
+		assert.Equal(t, "counter", metric.MType)
+		assert.Equal(t, delta, *metric.Delta)
+	})
+
+	t.Run("GetAllMetrics", func(t *testing.T) {
+		metrics := mockStorage.GetAllMetrics()
+		assert.Len(t, metrics, 2)
+		assert.Contains(t, metrics, "gauge:TestGauge=123.45")
+		assert.Contains(t, metrics, "counter:TestCounter=42")
+	})
+
+	mockStorage.AssertExpectations(t)
 }
