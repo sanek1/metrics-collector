@@ -15,6 +15,11 @@ const (
 	idleTimeout  = 15 * time.Second
 )
 
+// @title Metrics Collector API
+// @version 1.0
+// @description API для сбора и обработки метрик
+// @host localhost:8080
+// @BasePath /
 func main() {
 	go func() {
 		server := &http.Server{
@@ -29,6 +34,7 @@ func main() {
 			log.Fatal(err)
 		}
 	}()
+
 	opt := flags.ParseServerFlags()
 	if err := app.New(opt, opt.UseDatabase).Run(); err != nil {
 		log.Fatal(err)

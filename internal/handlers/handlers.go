@@ -20,18 +20,29 @@ const (
 	fileMode = 0600
 )
 
+// Storage представляет собой структуру для обработки HTTP-запросов к метрикам.
+// Предоставляет методы для взаимодействия с хранилищем метрик через HTTP API.
 type Storage struct {
 	Storage         storage.Storage
 	Logger          *l.ZapLogger
 	handlerServices *Services
 }
 
+// NewStorage создает новый экземпляр обработчика метрик.
+// Параметры:
+//   - s: хранилище метрик
+//   - zl: логгер
+//
+// Возвращает:
+//   - указатель на новый экземпляр Storage
 func NewStorage(s storage.Storage, zl *l.ZapLogger) *Storage {
 	hs := NewHandlerServices(s, nil, zl)
 
 	return &Storage{Storage: s, Logger: zl, handlerServices: hs}
 }
 
+// MainPageHandler обрабатывает запрос к главной странице, отображая все доступные метрики.
+// Возвращает HTML-страницу со списком всех метрик.
 func (s Storage) MainPageHandler(c *gin.Context) {
 	metrics := s.Storage.GetAllMetrics()
 	htmlData := GenerateHTMLServices(metrics)
@@ -39,6 +50,20 @@ func (s Storage) MainPageHandler(c *gin.Context) {
 	c.String(http.StatusOK, htmlData)
 }
 
+// GetMetricsByNameHandler обрабатывает запрос на получение метрики по имени и типу.
+// URL-параметры:
+//   - metricName: имя метрики
+//   - metricType: тип метрики (gauge или counter)
+//
+// Возвращает значение метрики или ошибку, если метрика не найдена.
+// @Summary Получить значение метрики
+// @Description Возвращает значение метрики по имени и типу
+// @Tags Metrics
+// @Produce  json
+// @Param metricType path string true "Тип метрики"
+// @Param metricName path string true "Имя метрики"
+// @Success 200 {object} m.Metrics
+// @Router /value/{metricType}/{metricName} [get]
 func (s Storage) GetMetricsByNameHandler(c *gin.Context) {
 	nameMetric := c.Param("metricName")
 	typeMetric := c.Param("metricType")
@@ -60,11 +85,27 @@ func (s Storage) GetMetricsByNameHandler(c *gin.Context) {
 	c.String(http.StatusNotFound, "GetMetricsByNameHandler No such value exists")
 }
 
+// GetMetricsByValueHandler обрабатывает запрос на получение метрики через JSON-формат.
+// Делегирует обработку запроса сервису handlerServices.
+// @Success 200 {object} m.Metrics
+// @Failure 400 {object} m.Metrics
+// @Failure 500 {object} m.Metrics
+// @Router /metrics [get]
+// @Success 200 {object} m.Metrics
+// @Failure 400 {object} m.Metrics
 func (s Storage) GetMetricsByValueHandler(c *gin.Context) {
 	s.Logger.InfoCtx(c.Request.Context(), "Handling GetMetricsByValueHandler request")
 	s.handlerServices.GetMetricsByValueGin(c)
 }
 
+// UpdateMetricFromURLHandler обрабатывает запрос на обновление метрики через URL-параметры.
+// URL-параметры:
+//   - metricType: тип метрики (gauge или counter)
+//   - metricName: имя метрики
+//   - metricValue: значение метрики
+//
+// Обновляет метрику и возвращает результат операции.
+// @author Firstname Lastname
 func (s Storage) UpdateMetricFromURLHandler(c *gin.Context) {
 	metricType := c.Param("metricType")
 	metricName := c.Param("metricName")
@@ -153,6 +194,19 @@ func (s Storage) UpdateMetricFromURLHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, updatedMetrics[0])
 }
 
+// MetricHandler обрабатывает запрос на обновление метрики через JSON в теле запроса.
+// Принимает JSON-представление метрики и делегирует обработку соответствующему сервису
+// в зависимости от типа метрики.
+// @Summary Обновление метрики через URL
+// @Description Обновляет значение метрики указанного типа
+// @Tags metrics
+// @Produce text/plain
+// @Param type path string true "Тип метрики (gauge/counter)"
+// @Param name path string true "Имя метрики"
+// @Param value path string true "Значение метрики"
+// @Success 200 {string} string "Метрика обновлена"
+// @Failure 400 {object} models.ErrorResponse
+// @Router /update/{type}/{name}/{value} [post]
 func (s Storage) MetricHandler(c *gin.Context) {
 	ctx := context.Background()
 	models, err := s.handlerServices.ParseMetricsServices(c)
@@ -173,6 +227,12 @@ func (s Storage) MetricHandler(c *gin.Context) {
 	}
 }
 
+// SaveToFile сохраняет состояние хранилища метрик в файл.
+// Параметры:
+//   - fname: имя файла для сохранения
+//
+// Возвращает:
+//   - ошибку, если не удалось сохранить файл
 func (s Storage) SaveToFile(fname string) error {
 	data, err := json.MarshalIndent(s.Storage, "", "   ")
 	if err != nil {
@@ -186,6 +246,8 @@ func (s Storage) SaveToFile(fname string) error {
 	return nil
 }
 
+// PingDBHandler обрабатывает запрос на проверку соединения с базой данных.
+// Делегирует обработку запроса сервису handlerServices.
 func (s Storage) PingDBHandler(c *gin.Context) {
 	s.Logger.InfoCtx(c.Request.Context(), "handler PingDBHandler")
 	c.Header("Content-Type", "application/json")
@@ -193,10 +255,14 @@ func (s Storage) PingDBHandler(c *gin.Context) {
 	s.handlerServices.PingService(c)
 }
 
+// NotImplementedHandler является обработчиком для еще не реализованных эндпоинтов.
+// Возвращает статус 404 Not Found.
 func NotImplementedHandler(rw http.ResponseWriter, r *http.Request) {
 	http.Error(rw, "Not Implemented", http.StatusNotFound)
 }
 
+// BadRequestHandler является обработчиком для некорректных запросов.
+// Возвращает статус 400 Bad Request.
 func BadRequestHandler(rw http.ResponseWriter, r *http.Request) {
 	http.Error(rw, "Bad Request Handler", http.StatusBadRequest)
 }

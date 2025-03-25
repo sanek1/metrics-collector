@@ -80,6 +80,7 @@ func (r *Router) InitRouting() http.Handler {
 	r.router.GET("/", r.s.MainPageHandler)
 	r.router.GET("/ping", r.s.PingDBHandler)
 	r.router.GET("/:metricValue/:metricType/:metricName", r.s.GetMetricsByNameHandler)
+
 	r.router.NoRoute(gin.WrapF(h.NotImplementedHandler))
 	return r.router
 }

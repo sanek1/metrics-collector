@@ -16,20 +16,43 @@ import (
 	"go.uber.org/zap"
 )
 
+// Services предоставляет сервисы для обработки метрик.
+// Реализует бизнес-логику для работы с различными типами метрик
+// и обеспечивает взаимодействие между хранилищем и HTTP-обработчиками.
 type Services struct {
 	s      storage.Storage
 	models *[]m.Metrics
 	logger *l.ZapLogger
 }
 
+// HServices определяет интерфейс сервисов обработки метрик.
+// Предоставляет методы для работы с различными типами метрик
+// и проверки соединения с хранилищем.
 type HServices interface {
+	// PingService проверяет соединение с хранилищем метрик.
 	PingService(c *gin.Context)
+
+	// CounterService обрабатывает запросы для метрик типа counter.
 	CounterService(c *gin.Context)
+
+	// GaugeService обрабатывает запросы для метрик типа gauge.
 	GaugeService(c *gin.Context)
+
+	// HistogramService обрабатывает запросы для метрик типа histogram.
 	HistogramService(c *gin.Context)
+
+	// MetricsService обрабатывает запросы для метрик любого типа.
 	MetricsService(c *gin.Context, models ...*m.Metrics)
 }
 
+// NewHandlerServices создает новый экземпляр сервисов обработки метрик.
+// Параметры:
+//   - st: хранилище метрик
+//   - models: указатель на срез метрик (может быть nil)
+//   - zl: логгер
+//
+// Возвращает:
+//   - указатель на новый экземпляр Services
 func NewHandlerServices(st storage.Storage, models *[]m.Metrics, zl *l.ZapLogger) *Services {
 	return &Services{
 		s:      st,
@@ -38,6 +61,9 @@ func NewHandlerServices(st storage.Storage, models *[]m.Metrics, zl *l.ZapLogger
 	}
 }
 
+// PingService проверяет соединение с хранилищем метрик.
+// Проверяет доступность базы данных, если хранилище поддерживает интерфейс DatabaseStorage.
+// Возвращает HTTP-ответ в зависимости от результата проверки.
 func (s *Services) PingService(c *gin.Context) {
 	if dbs, ok := s.s.(storage.DatabaseStorage); ok {
 		if !dbs.PingIsOk() {
@@ -48,6 +74,8 @@ func (s *Services) PingService(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{})
 }
 
+// CounterService обрабатывает запросы для метрик типа counter.
+// Устанавливает значение метрики и возвращает результат обновления.
 func (s *Services) CounterService(c *gin.Context) {
 	models := *s.models
 	updatedModels, err := s.s.SetCounter(c.Request.Context(), models...)
@@ -59,6 +87,8 @@ func (s *Services) CounterService(c *gin.Context) {
 	s.MetricsService(c, updatedModels...)
 }
 
+// GaugeService обрабатывает запросы для метрик типа gauge.
+// Устанавливает значение метрики и возвращает результат обновления.
 func (s *Services) GaugeService(c *gin.Context) {
 	models := *s.models
 	updatedModels, err := s.s.SetGauge(c.Request.Context(), models...)
@@ -75,6 +105,8 @@ func (s *Services) GaugeService(c *gin.Context) {
 	s.MetricsService(c, updatedModels...)
 }
 
+// MetricsService обрабатывает запросы для метрик любого типа.
+// Обрабатывает список метрик и возвращает результат обновления.
 func (s *Services) MetricsService(c *gin.Context, models ...*m.Metrics) {
 	if len(models) == 1 {
 		model := models[0]
@@ -84,6 +116,13 @@ func (s *Services) MetricsService(c *gin.Context, models ...*m.Metrics) {
 	c.JSON(http.StatusOK, models)
 }
 
+// ParseMetricsServices разбирает метрики из тела HTTP-запроса.
+// Поддерживает разбор как одиночной метрики, так и массива метрик в формате JSON.
+// Также поддерживает сжатие gzip.
+//
+// Возвращает:
+//   - срез разобранных метрик
+//   - ошибку, если не удалось разобрать метрики
 func (s *Services) ParseMetricsServices(c *gin.Context) ([]m.Metrics, error) {
 	var models []m.Metrics
 	r := c.Request
@@ -135,6 +174,10 @@ func (s *Services) ParseMetricsServices(c *gin.Context) ([]m.Metrics, error) {
 	}
 	return models, nil
 }
+
+// GetMetricsByValueGin обрабатывает запрос на получение значения метрики через JSON API.
+// Разбирает метрику из тела запроса, получает её значение из хранилища
+// и возвращает результат.
 func (s *Services) GetMetricsByValueGin(c *gin.Context) {
 	bodyBytes, err := c.GetRawData()
 	if err != nil {
@@ -189,6 +232,11 @@ func (s *Services) GetMetricsByValueGin(c *gin.Context) {
 	c.JSON(http.StatusOK, metric)
 }
 
+// buildJSONBody формирует тело JSON-ответа для метрики.
+// Используется для формирования ответа при обработке метрик.
+//
+// Возвращает:
+//   - ошибку, если не удалось сформировать тело ответа
 func (s *Services) buildJSONBody(c *gin.Context) (err error) {
 	metricType := c.Param("metricType")
 	metricName := c.Param("metricName")
@@ -219,6 +267,12 @@ func (s *Services) buildJSONBody(c *gin.Context) (err error) {
 	return nil
 }
 
+// GenerateHTMLServices генерирует HTML-страницу со списком всех метрик.
+// Параметры:
+//   - metrics: срез строк с именами метрик
+//
+// Возвращает:
+//   - строку с HTML-разметкой
 func GenerateHTMLServices(metrics []string) string {
 	data := `<html lang="ru"><head><meta charset="UTF-8"><title>Метрики</title></head><body><h1>Метрики</h1>`
 	for _, metric := range metrics {
@@ -228,6 +282,10 @@ func GenerateHTMLServices(metrics []string) string {
 	return data
 }
 
+// SendResultStatusOK отправляет успешный ответ с данными.
+// Параметры:
+//   - rw: объект ResponseWriter для записи ответа
+//   - resp: данные для отправки
 func SendResultStatusOK(rw http.ResponseWriter, resp []byte) {
 	rw.WriteHeader(http.StatusOK)
 	rw.Header().Set("Content-Type", "application/json")
@@ -238,6 +296,10 @@ func SendResultStatusOK(rw http.ResponseWriter, resp []byte) {
 	}
 }
 
+// SendResultStatusNotOK отправляет ответ с ошибкой.
+// Параметры:
+//   - rw: объект ResponseWriter для записи ответа
+//   - err: ошибка для отправки
 func SendResultStatusNotOK(rw http.ResponseWriter, err error) {
 	http.Error(rw, err.Error(), http.StatusBadRequest)
 }
