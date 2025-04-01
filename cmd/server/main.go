@@ -5,13 +5,15 @@ import (
 	"net/http"
 	"time"
 
+	_ "net/http/pprof"
+
 	app "github.com/sanek1/metrics-collector/internal/app/server"
 	flags "github.com/sanek1/metrics-collector/internal/flags/server"
 )
 
 const (
 	readTimeout  = 5 * time.Second
-	writeTimeout = 10 * time.Second
+	writeTimeout = 60 * time.Second
 	idleTimeout  = 15 * time.Second
 )
 

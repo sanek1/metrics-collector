@@ -44,6 +44,7 @@ func (r *Router) InitRouting() http.Handler {
 	if r.opt.CryptoKey != "" {
 		r.router.Use(r.middlewareHash.HashMiddleware())
 	}
+	r.router.GET("/debug/")
 
 	r.router.Use(v.GzipMiddleware())
 	r.router.Use(func(c *gin.Context) {
