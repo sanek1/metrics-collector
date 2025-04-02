@@ -66,3 +66,14 @@ type FileStorage interface {
 	//   - interval: интервал между сохранениями
 	PeriodicallySaveBackUp(ctx context.Context, filename string, restore bool, interval time.Duration)
 }
+
+type StorageHelper interface {
+	FilterBatchesBeforeSaving(metrics []m.Metrics) []m.Metrics
+	SortingBatchData(existingMetrics []*m.Metrics, metrics []m.Metrics) (updatingBatch, insertingBatch []m.Metrics)
+	CollectorQuery(ctx context.Context, metrics []m.Metrics) (query string, mTypes []string, args []interface{})
+	UpdateMetrics(ctx context.Context, models []m.Metrics) error
+	InsertMetric(ctx context.Context, models []m.Metrics) error
+	GetMetricsOnDBs(ctx context.Context, models ...m.Metrics) ([]*m.Metrics, error)
+	SetMetrics(ctx context.Context, models []m.Metrics) ([]*m.Metrics, error)
+	EnsureMetricsTableExists(ctx context.Context) error
+}

@@ -19,7 +19,7 @@ import (
 	l "github.com/sanek1/metrics-collector/pkg/logging"
 )
 
-func TestGetMetricsByBody(t *testing.T) {
+func TestGetMetricsByBody_MetricHandler(t *testing.T) {
 	value1 := float64(123)
 	value2 := int64(-123)
 
@@ -62,8 +62,6 @@ func TestGetMetricsByBody(t *testing.T) {
 			req, err := http.NewRequestWithContext(ctx, "POST", "/", bytes.NewBuffer(b))
 			require.NoError(t, err)
 			w := httptest.NewRecorder()
-
-			gin.SetMode(gin.TestMode)
 			c, _ := gin.CreateTestContext(w)
 			c.Request = req
 			memStorage.MetricHandler(c)
@@ -114,8 +112,6 @@ func TestBatchMetricsByBody(t *testing.T) {
 			req, err := http.NewRequestWithContext(ctx, "POST", "/", bytes.NewBuffer(b))
 			require.NoError(t, err)
 			w := httptest.NewRecorder()
-
-			gin.SetMode(gin.TestMode)
 			c, _ := gin.CreateTestContext(w)
 			c.Request = req
 			memStorage.MetricHandler(c)

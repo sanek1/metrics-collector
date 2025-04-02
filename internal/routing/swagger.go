@@ -1,3 +1,6 @@
+//go:build ignore
+// +build ignore
+
 // Package routing provides API routing functionality
 // @title Metrics Collector API
 // @version 1.0

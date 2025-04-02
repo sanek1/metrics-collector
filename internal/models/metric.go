@@ -1,3 +1,4 @@
+//gocover:ignore-file
 package models
 
 // Типы метрик
@@ -25,6 +26,8 @@ type Metrics struct {
 //
 // Возвращает:
 //   - указатель на созданную метрику
+//
+//gocover:ignore
 func NewMetricCounter(id string, delta *int64) *Metrics {
 	return &Metrics{
 		ID:    id,

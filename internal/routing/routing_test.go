@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -40,9 +39,7 @@ func (m *MockLogger) DebugCtx(ctx context.Context, msg string, fields ...interfa
 	m.Called(ctx, msg, fields)
 }
 
-func TestRouterWithMocks(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
+func TestRouterWithMocks_InitRouting(t *testing.T) {
 	mockStorage := new(mocks.Storage)
 	mockLogger := new(MockLogger)
 

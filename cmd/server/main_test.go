@@ -30,9 +30,6 @@ func TestRouter(t *testing.T) {
 	if err != nil {
 		log.Panic(err)
 	}
-
-	gin.SetMode(gin.TestMode)
-
 	s := storage.GetStorage(false, nil, l)
 	memStorage := h.NewStorage(s, l)
 
@@ -76,8 +73,6 @@ func TestGzipCompression(t *testing.T) {
 	if err != nil {
 		log.Panic(err)
 	}
-
-	gin.SetMode(gin.TestMode)
 
 	s := storage.GetStorage(false, nil, l)
 	memStorage := h.NewStorage(s, l)

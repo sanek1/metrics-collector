@@ -91,7 +91,7 @@ func CollectorQuery(ctx context.Context, metrics []m.Metrics) (query string, mTy
 	return query, mTypes, args
 }
 
-func (s *DBStorage) updateMetrics(ctx context.Context, models []m.Metrics) error {
+func (s *DBStorage) UpdateMetrics(ctx context.Context, models []m.Metrics) error {
 	batch := &pgx.Batch{}
 	for _, model := range models {
 		if model.MType == m.TypeCounter {
@@ -110,7 +110,7 @@ func (s *DBStorage) updateMetrics(ctx context.Context, models []m.Metrics) error
 	}
 	return err
 }
-func (s *DBStorage) insertMetric(ctx context.Context, models []m.Metrics) error {
+func (s *DBStorage) InsertMetric(ctx context.Context, models []m.Metrics) error {
 	conn, err := s.conn.Acquire(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to acquire connection: %w", err)
@@ -135,7 +135,7 @@ func (s *DBStorage) insertMetric(ctx context.Context, models []m.Metrics) error 
 	return nil
 }
 
-func (s *DBStorage) getMetricsOnDBs(ctx context.Context, metrics ...m.Metrics) ([]*m.Metrics, error) {
+func (s *DBStorage) GetMetricsOnDBs(ctx context.Context, metrics ...m.Metrics) ([]*m.Metrics, error) {
 	jsonData, _ := json.Marshal(metrics)
 	s.Logger.DebugCtx(ctx, "METRICS "+string(jsonData))
 
@@ -177,29 +177,29 @@ func (s *DBStorage) getMetricsOnDBs(ctx context.Context, metrics ...m.Metrics) (
 	return results, nil
 }
 
-func (s *DBStorage) setMetrics(ctx context.Context, models ...m.Metrics) ([]*m.Metrics, error) {
+func (s *DBStorage) SetMetrics(ctx context.Context, models ...m.Metrics) ([]*m.Metrics, error) {
 	models = FilterBatchesBeforeSaving(models)
 
-	existingMetrics, err := s.getMetricsOnDBs(ctx, models...)
+	existingMetrics, err := s.GetMetricsOnDBs(ctx, models...)
 	if err != nil {
 		return nil, err
 	}
 	updatingBatch, insertingBatch := SortingBatchData(existingMetrics, models)
 
 	if len(updatingBatch) != 0 {
-		if err := s.updateMetrics(ctx, updatingBatch); err != nil {
+		if err := s.UpdateMetrics(ctx, updatingBatch); err != nil {
 			s.Logger.ErrorCtx(ctx, "failed to update metric", zap.Error(err))
 			return nil, err
 		}
 	}
 	if len(insertingBatch) != 0 {
-		if err := s.insertMetric(ctx, insertingBatch); err != nil {
+		if err := s.InsertMetric(ctx, insertingBatch); err != nil {
 			s.Logger.ErrorCtx(ctx, "failed to insert metric", zap.Error(err))
 			return nil, err
 		}
 	}
 
-	metrics, err := s.getMetricsOnDBs(ctx, models...)
+	metrics, err := s.GetMetricsOnDBs(ctx, models...)
 	if err != nil {
 		return nil, err
 	}
