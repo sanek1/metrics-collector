@@ -8,11 +8,12 @@ import (
 	"os"
 	"time"
 
+	"go.uber.org/zap"
+
 	ac "github.com/sanek1/metrics-collector/internal/controller/agent"
 	af "github.com/sanek1/metrics-collector/internal/flags/agent"
 	as "github.com/sanek1/metrics-collector/internal/storage/agent"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
-	"go.uber.org/zap"
 )
 
 const (

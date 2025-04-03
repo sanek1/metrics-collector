@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	h "github.com/sanek1/metrics-collector/internal/handlers"
 	storage "github.com/sanek1/metrics-collector/internal/storage/server"
 	v "github.com/sanek1/metrics-collector/internal/validation"
@@ -32,42 +33,37 @@ func TestRouter(t *testing.T) {
 	s := storage.GetStorage(false, nil, l)
 	memStorage := h.NewStorage(s, l)
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		v.GzipMiddleware(http.HandlerFunc(memStorage.MetricHandler)).ServeHTTP(w, r)
-	})
-
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
+	router := gin.New()
+	router.Use(v.GzipMiddleware())
+	router.POST("/update/counter/:metricName/:metricValue", memStorage.MetricHandler)
+	router.POST("/update/gauge/:metricName/:metricValue", memStorage.MetricHandler)
+	router.POST("/", memStorage.MetricHandler)
 
 	var testTable = []testTable{
 		{"/update/counter/Mallocs/777", `{"id": "test_Mallocs", "type": "counter", "delta": 5, "value": 123.4}`, `{"id":"test_Mallocs","type":"counter","delta":5}`, http.StatusOK},
-		{"/update/counter/Mallocs/777", `{"id": "test_Mallocs", "type": "counter", "delta": 6, "value": 123.4}`, `{"id":"test_Mallocs","type":"counter","delta":11}`, http.StatusOK}, // expected 5+5=10
+		{"/update/counter/Mallocs/777", `{"id": "test_Mallocs", "type": "counter", "delta": 6, "value": 123.4}`, `{"id":"test_Mallocs","type":"counter","delta":11}`, http.StatusOK},
 		{"/update/gauge/Alloc/777", `{"id": "test_Alloc", "type": "gauge", "value": 123.4}`, `{"id":"test_Alloc","type":"gauge","value":123.4}`, http.StatusOK},
 	}
-	for _, v := range testTable {
-		t.Run("sends_gzip", func(t *testing.T) {
-			buf := bytes.NewBuffer(nil)
-			zb := gzip.NewWriter(buf)
-			_, err := zb.Write([]byte(v.body))
+
+	for _, tt := range testTable {
+		t.Run("sends_gzip_"+tt.url, func(t *testing.T) {
+			var buf bytes.Buffer
+			zw := gzip.NewWriter(&buf)
+			_, err := zw.Write([]byte(tt.body))
 			require.NoError(t, err)
-			err = zb.Close()
+			err = zw.Close()
 			require.NoError(t, err)
 
-			r := httptest.NewRequest("POST", srv.URL, buf)
-			r.RequestURI = ""
-			r.Header.Set("Content-Encoding", "gzip")
-			r.Header.Set("Accept-Encoding", "")
+			req := httptest.NewRequest(http.MethodPost, tt.url, &buf)
+			req.Header.Set("Content-Encoding", "gzip")
 
-			resp, err := http.DefaultClient.Do(r)
-			require.NoError(t, err)
-			require.Equal(t, v.status, resp.StatusCode)
+			w := httptest.NewRecorder()
 
-			defer resp.Body.Close()
+			router.ServeHTTP(w, req)
 
-			b, err := io.ReadAll(resp.Body)
-			require.NoError(t, err)
-			str := string(b)
-			require.JSONEq(t, v.want, str)
+			require.Equal(t, tt.status, w.Code)
+
+			require.JSONEq(t, tt.want, w.Body.String())
 		})
 	}
 }
@@ -77,63 +73,54 @@ func TestGzipCompression(t *testing.T) {
 	if err != nil {
 		log.Panic(err)
 	}
+
 	s := storage.GetStorage(false, nil, l)
+	memStorage := h.NewStorage(s, l)
 
-	ms := h.NewStorage(s, l)
-
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		v.GzipMiddleware(http.HandlerFunc(ms.MetricHandler)).ServeHTTP(w, r)
-	})
-
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
+	router := gin.New()
+	router.Use(v.GzipMiddleware())
+	router.POST("/", memStorage.MetricHandler)
 
 	requestBody := `{"id": "testSetGet33", "type": "gauge", "value": 123.4}`
 	successBody := `{"id":"testSetGet33","type":"gauge","value":123.4}`
 
 	t.Run("sends_gzip", func(t *testing.T) {
-		buf := bytes.NewBuffer(nil)
-		zb := gzip.NewWriter(buf)
-		_, err := zb.Write([]byte(requestBody))
+		var buf bytes.Buffer
+		zw := gzip.NewWriter(&buf)
+		_, err := zw.Write([]byte(requestBody))
 		require.NoError(t, err)
-		err = zb.Close()
+		err = zw.Close()
 		require.NoError(t, err)
 
-		r := httptest.NewRequest("POST", srv.URL, buf)
-		r.RequestURI = ""
-		r.Header.Set("Content-Encoding", "gzip")
-		r.Header.Set("Accept-Encoding", "")
+		req := httptest.NewRequest("POST", "/", &buf)
+		req.Header.Set("Content-Encoding", "gzip")
 
-		resp, err := http.DefaultClient.Do(r)
-		require.NoError(t, err)
-		require.Equal(t, http.StatusOK, resp.StatusCode)
+		w := httptest.NewRecorder()
 
-		defer resp.Body.Close()
+		router.ServeHTTP(w, req)
 
-		b, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-		str := string(b)
-		require.JSONEq(t, successBody, str)
+		require.Equal(t, http.StatusOK, w.Code)
+		require.JSONEq(t, successBody, w.Body.String())
 	})
 
 	t.Run("accepts_gzip", func(t *testing.T) {
-		buf := bytes.NewBufferString(requestBody)
-		r := httptest.NewRequest("POST", srv.URL, buf)
-		r.RequestURI = ""
-		r.Header.Set("Accept-Encoding", "gzip")
+		req := httptest.NewRequest("POST", "/", bytes.NewBufferString(requestBody))
+		req.Header.Set("Accept-Encoding", "gzip")
 
-		resp, err := http.DefaultClient.Do(r)
-		require.NoError(t, err)
-		require.Equal(t, http.StatusOK, resp.StatusCode)
+		w := httptest.NewRecorder()
 
-		defer resp.Body.Close()
+		router.ServeHTTP(w, req)
 
-		zr, err := gzip.NewReader(resp.Body)
-		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, w.Code)
 
-		b, err := io.ReadAll(zr)
+		require.Equal(t, "gzip", w.Header().Get("Content-Encoding"))
+
+		zr, err := gzip.NewReader(w.Body)
 		require.NoError(t, err)
 
-		require.JSONEq(t, successBody, string(b))
+		decompressedBody, err := io.ReadAll(zr)
+		require.NoError(t, err)
+
+		require.JSONEq(t, successBody, string(decompressedBody))
 	})
 }

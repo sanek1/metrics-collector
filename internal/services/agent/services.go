@@ -9,8 +9,9 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/sanek1/metrics-collector/internal/models"
 	"go.uber.org/zap"
+
+	"github.com/sanek1/metrics-collector/internal/models"
 )
 
 func (s Services) SendToServerAsync(ctx context.Context, client *http.Client, url string, m []models.Metrics) error {
@@ -75,7 +76,7 @@ func (s Services) SendToServerMetric(ctx context.Context, client *http.Client, u
 func (s Services) sendToServer(ctx context.Context, client *http.Client, req *http.Request) error {
 	resp, err := client.Do(req)
 	if err != nil {
-		s.l.ErrorCtx(ctx, "Request sending failed",
+		s.l.ErrorCtx(ctx, "sendToServer Request sending failed",
 			zap.String("method", req.Method),
 			zap.String("url", req.URL.String()),
 			zap.Error(err),

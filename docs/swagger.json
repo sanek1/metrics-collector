@@ -1,0 +1,100 @@
+{
+    "schemes": [
+        "http",
+        "https"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "Сервис для сбора и мониторинга метрик",
+        "title": "Metrics Collector API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/metrics": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_sanek1_metrics-collector_internal_models.Metrics"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_sanek1_metrics-collector_internal_models.Metrics"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_sanek1_metrics-collector_internal_models.Metrics"
+                        }
+                    }
+                }
+            }
+        },
+        "/value/{metricType}/{metricName}": {
+            "get": {
+                "description": "Возвращает значение метрики по имени и типу",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Metrics"
+                ],
+                "summary": "Получить значение метрики",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Тип метрики",
+                        "name": "metricType",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Имя метрики",
+                        "name": "metricName",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_sanek1_metrics-collector_internal_models.Metrics"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "github_com_sanek1_metrics-collector_internal_models.Metrics": {
+            "type": "object",
+            "properties": {
+                "delta": {
+                    "description": "Count of the metric",
+                    "type": "integer"
+                },
+                "id": {
+                    "description": "Name of the metric",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "Type of the metric",
+                    "type": "string"
+                },
+                "value": {
+                    "description": "Gauge value",
+                    "type": "number"
+                }
+            }
+        }
+    }
+}

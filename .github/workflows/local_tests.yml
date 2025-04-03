@@ -1,0 +1,26 @@
+name: local tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master 
+
+jobs: 
+  local_tests:
+    name: Local Tests
+    runs-on: ubuntu-latest
+    container: golang:1.23
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Run go tests
+        run: go test -v -coverprofile=coverage.out ./...
+      - name: Show coverage summary 
+        run: go tool cover -func=coverage.out
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report 
+          path: coverage.out

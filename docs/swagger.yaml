@@ -1,0 +1,67 @@
+basePath: /
+definitions:
+  github_com_sanek1_metrics-collector_internal_models.Metrics:
+    properties:
+      delta:
+        description: Count of the metric
+        type: integer
+      id:
+        description: Name of the metric
+        type: string
+      type:
+        description: Type of the metric
+        type: string
+      value:
+        description: Gauge value
+        type: number
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Сервис для сбора и мониторинга метрик
+  title: Metrics Collector API
+  version: "1.0"
+paths:
+  /metrics:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_sanek1_metrics-collector_internal_models.Metrics'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_sanek1_metrics-collector_internal_models.Metrics'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_sanek1_metrics-collector_internal_models.Metrics'
+  /value/{metricType}/{metricName}:
+    get:
+      description: Возвращает значение метрики по имени и типу
+      parameters:
+      - description: Тип метрики
+        in: path
+        name: metricType
+        required: true
+        type: string
+      - description: Имя метрики
+        in: path
+        name: metricName
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_sanek1_metrics-collector_internal_models.Metrics'
+      summary: Получить значение метрики
+      tags:
+      - Metrics
+schemes:
+- http
+- https
+swagger: "2.0"

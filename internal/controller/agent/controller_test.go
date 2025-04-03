@@ -5,9 +5,10 @@ import (
 	"net/http"
 	"testing"
 
+	"go.uber.org/zap"
+
 	flags "github.com/sanek1/metrics-collector/internal/flags/agent"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
-	"go.uber.org/zap"
 )
 
 func TestSendingGaugeMetrics(t *testing.T) {

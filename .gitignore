@@ -31,3 +31,5 @@ vendor/
 /logs
 /.runtime
 /BACKUP
+/profiles_new
+/profilesnew

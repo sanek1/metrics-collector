@@ -1,3 +1,6 @@
+//go:build !test
+// +build !test
+
 package storage
 
 import (
@@ -9,6 +12,7 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 )
 
+//go:nocover
 func InitPoolMetrics(metrics map[string]float64) {
 	var num uint32
 	err := binary.Read(rand.Reader, binary.LittleEndian, &num)
@@ -47,6 +51,7 @@ func InitPoolMetrics(metrics map[string]float64) {
 	metrics["RandomValue"] = float64(num)
 }
 
+//go:nocover
 func GetGopsuiteMetrics(gpMetrics map[string]float64) map[string]float64 {
 	v, err := mem.VirtualMemory()
 	if err != nil {

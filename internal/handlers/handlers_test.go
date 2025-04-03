@@ -9,15 +9,17 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	m "github.com/sanek1/metrics-collector/internal/models"
-	storage "github.com/sanek1/metrics-collector/internal/storage/server"
-	l "github.com/sanek1/metrics-collector/pkg/logging"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+
+	m "github.com/sanek1/metrics-collector/internal/models"
+	storage "github.com/sanek1/metrics-collector/internal/storage/server"
+	l "github.com/sanek1/metrics-collector/pkg/logging"
 )
 
-func TestGetMetricsByBody(t *testing.T) {
+func TestGetMetricsByBody_MetricHandler(t *testing.T) {
 	value1 := float64(123)
 	value2 := int64(-123)
 
@@ -60,7 +62,9 @@ func TestGetMetricsByBody(t *testing.T) {
 			req, err := http.NewRequestWithContext(ctx, "POST", "/", bytes.NewBuffer(b))
 			require.NoError(t, err)
 			w := httptest.NewRecorder()
-			memStorage.MetricHandler(w, req)
+			c, _ := gin.CreateTestContext(w)
+			c.Request = req
+			memStorage.MetricHandler(c)
 
 			assert.Equal(t, test.expectedStatus, w.Code)
 		})
@@ -108,7 +112,9 @@ func TestBatchMetricsByBody(t *testing.T) {
 			req, err := http.NewRequestWithContext(ctx, "POST", "/", bytes.NewBuffer(b))
 			require.NoError(t, err)
 			w := httptest.NewRecorder()
-			memStorage.MetricHandler(w, req)
+			c, _ := gin.CreateTestContext(w)
+			c.Request = req
+			memStorage.MetricHandler(c)
 
 			assert.Equal(t, test.expectedStatus, w.Code)
 		})

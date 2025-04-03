@@ -9,10 +9,11 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.uber.org/zap"
+
 	flags "github.com/sanek1/metrics-collector/internal/flags/server"
 	m "github.com/sanek1/metrics-collector/internal/models"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
-	"go.uber.org/zap"
 )
 
 type DBStorage struct {
@@ -37,10 +38,10 @@ func NewDBStorage(opt *flags.ServerOptions, logger *l.ZapLogger) *DBStorage {
 }
 
 func (s *DBStorage) SetGauge(ctx context.Context, models ...m.Metrics) ([]*m.Metrics, error) {
-	return s.setMetrics(ctx, models...)
+	return s.SetMetrics(ctx, models...)
 }
 func (s *DBStorage) SetCounter(ctx context.Context, models ...m.Metrics) ([]*m.Metrics, error) {
-	return s.setMetrics(ctx, models...)
+	return s.SetMetrics(ctx, models...)
 }
 
 func (s *DBStorage) GetAllMetrics() []string {
@@ -72,7 +73,7 @@ func (s *DBStorage) GetMetrics(ctx context.Context, mType, id string) (*m.Metric
 	metric.ID = id
 	metric.MType = mType
 
-	models, err := s.getMetricsOnDBs(ctx, metric)
+	models, err := s.GetMetricsOnDBs(ctx, metric)
 	if err != nil || len(models) == 0 {
 		return nil, false
 	}

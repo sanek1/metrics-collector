@@ -2,12 +2,12 @@ package validation
 
 import (
 	"net/http"
-	"strings"
 
-	"github.com/sanek1/metrics-collector/internal/config"
+	"go.uber.org/zap"
+
+	"github.com/gin-gonic/gin"
 	"github.com/sanek1/metrics-collector/internal/handlers"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
-	"go.uber.org/zap"
 )
 
 type Middleware func(http.Handler) http.Handler
@@ -24,46 +24,14 @@ func NewValidation(s *handlers.Storage, logger *l.ZapLogger) *MiddlewareControll
 	}
 }
 
-func Conveyor(h http.Handler, middlewares ...Middleware) http.Handler {
-	for _, middleware := range middlewares {
-		h = middleware(h)
-	}
-	return h
-}
-func (c *MiddlewareController) Recover(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func (mc *MiddlewareController) Recover(next http.Handler) gin.HandlerFunc {
+	return func(c *gin.Context) {
 		defer func() {
 			if rec := recover(); rec != nil {
-				c.l.PanicCtx(r.Context(), "recovered from panic", zap.Any("panic", rec))
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				mc.l.PanicCtx(c.Request.Context(), "recovered from panic", zap.Any("panic", rec))
+				http.Error(c.Writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			}
 		}()
-
-		next.ServeHTTP(w, r)
-	})
-}
-
-func (c *MiddlewareController) ValidationOld(next http.Handler) func(http.ResponseWriter, *http.Request) {
-	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		rw.Header().Set("Content-Type", "application/json")
-		splitedPath := strings.Split(r.URL.Path, "/")
-		if len(splitedPath) < config.MinPathLen {
-			message := "invalid path"
-			c.l.ErrorCtx(r.Context(), message, zap.Any("invalid path", r.URL.Path))
-			http.Error(rw, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-			return
-		}
-		next.ServeHTTP(rw, r)
-	})
-}
-
-func (c *MiddlewareController) CheckForPingMiddleware(next http.Handler) func(http.ResponseWriter, *http.Request) {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.URL.Path, "/ping") {
-			c.l.InfoCtx(r.Context(), "ping request")
-			c.s.PingDBHandler(w, r)
-		} else {
-			http.StripPrefix(r.URL.Path, next).ServeHTTP(w, r)
-		}
-	})
+		next.ServeHTTP(c.Writer, c.Request)
+	}
 }

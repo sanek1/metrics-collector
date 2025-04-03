@@ -4,90 +4,264 @@ import (
 	"context"
 	"testing"
 
-	flags "github.com/sanek1/metrics-collector/internal/flags/server"
-	m "github.com/sanek1/metrics-collector/internal/models"
-	l "github.com/sanek1/metrics-collector/pkg/logging"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
+
+	m "github.com/sanek1/metrics-collector/internal/models"
+	"github.com/sanek1/metrics-collector/internal/storage/server/mocks"
 )
 
-func TestInsertUpdateMultipleMetricsInBatch(t *testing.T) {
-	value1 := float64(123)
-	value2 := int64(-123)
-	value3 := int64(1)
+func TestStorage_GetAllMetrics(t *testing.T) {
+	mockStorage := mocks.NewStorage(t)
+	t.Run("returns all metrics", func(t *testing.T) {
+		expected := []string{
+			"counter:test1=42",
+			"gauge:test2=123.45",
+		}
 
+		mockStorage.On("GetAllMetrics").Return(expected).Once()
+
+		result := mockStorage.GetAllMetrics()
+		assert.Equal(t, expected, result)
+		mockStorage.AssertExpectations(t)
+	})
+
+	t.Run("returns empty list", func(t *testing.T) {
+		mockStorage.On("GetAllMetrics").Return([]string{}).Once()
+
+		result := mockStorage.GetAllMetrics()
+		assert.Empty(t, result)
+		mockStorage.AssertExpectations(t)
+	})
+}
+
+func TestStorage_GetMetrics(t *testing.T) {
+	mockStorage := mocks.NewStorage(t)
 	ctx := context.Background()
-	opt := flags.ParseServerFlags()
-	if opt.DBPath == "" {
-		return
-	}
-	logger, _ := l.NewZapLogger(zap.InfoLevel)
 
-	storage := NewDBStorage(opt, logger)
-
-	// Prepare test data
-	testMetrics := []m.Metrics{
-		{ID: "metric1", MType: "counter", Delta: &value2, Value: nil},
-		{ID: "metric2", MType: "gauge", Delta: nil, Value: &value1},
-		{ID: "metric3", MType: "counter", Delta: &value2, Value: &value1},
-		{ID: "metric1", MType: "counter", Delta: &value3, Value: nil},
-	}
-	// check EnsureMetricsTableExists
-	if err := storage.EnsureMetricsTableExists(ctx); err != nil {
-		t.Error("failed to ensure metrics table exists: %w", err)
-	}
-
-	models := FilterBatchesBeforeSaving(testMetrics)
-
-	existingMetrics, _ := storage.getMetricsOnDBs(ctx, models...)
-	// filter duplicates and sort before updating/inserting
-	updatingBatch, insertingBatch := SortingBatchData(existingMetrics, models)
-
-	if len(updatingBatch) != 0 {
-		if err := storage.updateMetrics(ctx, updatingBatch); err != nil {
-			storage.Logger.ErrorCtx(ctx, "failed to update metric", zap.Error(err))
-			t.Error("failed to update metric: %w", err)
+	t.Run("existing counter metric", func(t *testing.T) {
+		delta := int64(42)
+		expected := &m.Metrics{
+			ID:    "test1",
+			MType: "counter",
+			Delta: &delta,
 		}
+
+		mockStorage.On("GetMetrics", ctx, "counter", "test1").Return(expected, true).Once()
+
+		metric, found := mockStorage.GetMetrics(ctx, "counter", "test1")
+		require.True(t, found)
+		assert.Equal(t, expected, metric)
+		mockStorage.AssertExpectations(t)
+	})
+
+	t.Run("non-existing gauge metric", func(t *testing.T) {
+		mockStorage.On("GetMetrics", ctx, "gauge", "unknown").Return((*m.Metrics)(nil), false).Once()
+
+		_, found := mockStorage.GetMetrics(ctx, "gauge", "unknown")
+		assert.False(t, found)
+		mockStorage.AssertExpectations(t)
+	})
+}
+
+func TestStorage_SetCounter(t *testing.T) {
+	mockStorage := mocks.NewStorage(t)
+	ctx := context.Background()
+	delta := int64(10)
+	metrics := []m.Metrics{
+		{ID: "test1", MType: "counter", Delta: &delta},
 	}
-	if len(insertingBatch) != 0 {
-		if err := storage.insertMetric(ctx, insertingBatch); err != nil {
-			storage.Logger.ErrorCtx(ctx, "failed to insert metric", zap.Error(err))
-			t.Error("failed to insert metric: %w", err)
+
+	t.Run("successful counter update", func(t *testing.T) {
+		expected := []*m.Metrics{
+			{ID: "test1", MType: "counter", Delta: &delta},
 		}
+
+		mockStorage.On("SetCounter", ctx, mock.Anything).Return(expected, nil).Once()
+
+		result, err := mockStorage.SetCounter(ctx, metrics...)
+		require.NoError(t, err)
+		assert.Len(t, result, 1)
+		assert.Equal(t, delta, *result[0].Delta)
+		mockStorage.AssertExpectations(t)
+	})
+
+	t.Run("error on counter update", func(t *testing.T) {
+		mockStorage.On("SetCounter", ctx, mock.Anything).Return(
+			([]*m.Metrics)(nil), assert.AnError,
+		).Once()
+
+		_, err := mockStorage.SetCounter(ctx, metrics...)
+		assert.Error(t, err)
+		mockStorage.AssertExpectations(t)
+	})
+}
+
+func TestStorage_SetGauge(t *testing.T) {
+	mockStorage := mocks.NewStorage(t)
+	ctx := context.Background()
+	value := 123.45
+	metrics := []m.Metrics{
+		{ID: "test2", MType: "gauge", Value: &value},
 	}
 
-	// Verify metrics are inserted correctly
-	metricMap := make(map[string]m.Metrics)
-	for _, metric := range models {
-		metricMap[metric.ID] = metric
-	}
-
-	// Verify metrics are inserted correctly
-	metricMapBefore := make(map[string]m.Metrics)
-	for _, metric := range existingMetrics {
-		metricMapBefore[metric.ID] = *metric
-	}
-
-	retrievedMetrics, err := storage.getMetricsOnDBs(ctx, testMetrics...)
-	require.NoError(t, err)
-
-	for _, retrievedMetric := range retrievedMetrics {
-		expectedMetric, exists := metricMap[retrievedMetric.ID]
-		require.True(t, exists)
-		assert.Equal(t, expectedMetric.ID, retrievedMetric.ID)
-		assert.Equal(t, expectedMetric.MType, retrievedMetric.MType)
-
-		if retrievedMetric.MType == "counter" {
-			if metricMapBefore[expectedMetric.ID].Delta == nil {
-				assert.Equal(t, *expectedMetric.Delta, *retrievedMetric.Delta)
-			} else {
-				oldDelta := *metricMapBefore[expectedMetric.ID].Delta
-				assert.Equal(t, *expectedMetric.Delta+oldDelta, *retrievedMetric.Delta)
-			}
-		} else {
-			assert.Equal(t, expectedMetric.Delta, retrievedMetric.Delta)
+	t.Run("successful gauge update", func(t *testing.T) {
+		expected := []*m.Metrics{
+			{ID: "test2", MType: "gauge", Value: &value},
 		}
-		assert.Equal(t, expectedMetric.Value, retrievedMetric.Value)
+
+		mockStorage.On("SetGauge", ctx, mock.Anything).Return(expected, nil).Once()
+
+		result, err := mockStorage.SetGauge(ctx, metrics...)
+		require.NoError(t, err)
+		assert.Len(t, result, 1)
+		assert.Equal(t, value, *result[0].Value)
+		mockStorage.AssertExpectations(t)
+	})
+
+	t.Run("error on gauge update", func(t *testing.T) {
+		mockStorage.On("SetGauge", ctx, mock.Anything).Return(
+			([]*m.Metrics)(nil), assert.AnError,
+		).Once()
+
+		_, err := mockStorage.SetGauge(ctx, metrics...)
+		assert.Error(t, err)
+		mockStorage.AssertExpectations(t)
+	})
+}
+
+func TestStorage_EdgeCases(t *testing.T) {
+	mockStorage := mocks.NewStorage(t)
+	ctx := context.Background()
+
+	t.Run("empty metrics list", func(t *testing.T) {
+		mockStorage.On("SetCounter", ctx).Return([]*m.Metrics{}, nil).Once()
+
+		result, err := mockStorage.SetCounter(ctx)
+		require.NoError(t, err)
+		assert.Empty(t, result)
+		mockStorage.AssertExpectations(t)
+	})
+
+	t.Run("nil values handling", func(t *testing.T) {
+		invalidMetric := m.Metrics{
+			ID:    "invalid",
+			MType: "counter",
+			Delta: nil,
+		}
+
+		mockStorage.On("SetCounter", ctx, invalidMetric).Return(
+			([]*m.Metrics)(nil), assert.AnError,
+		).Once()
+
+		_, err := mockStorage.SetCounter(ctx, invalidMetric)
+		assert.Error(t, err)
+		mockStorage.AssertExpectations(t)
+	})
+}
+
+func TestStorageWithMocks(t *testing.T) {
+	mockStorage := mocks.NewStorage(t)
+	ctx := context.Background()
+	value := float64(123.45)
+	gaugeMetric := m.Metrics{
+		ID:    "TestGauge",
+		MType: "gauge",
+		Value: &value,
 	}
+
+	resultGaugeMetric := &m.Metrics{
+		ID:    "TestGauge",
+		MType: "gauge",
+		Value: &value,
+	}
+
+	mockStorage.On("SetGauge", mock.Anything, mock.Anything).Return([]*m.Metrics{resultGaugeMetric}, nil)
+	mockStorage.On("GetMetrics", mock.Anything, "gauge", "TestGauge").Return(resultGaugeMetric, true)
+
+	delta := int64(42)
+	counterMetric := m.Metrics{
+		ID:    "TestCounter",
+		MType: "counter",
+		Delta: &delta,
+	}
+
+	resultCounterMetric := &m.Metrics{
+		ID:    "TestCounter",
+		MType: "counter",
+		Delta: &delta,
+	}
+
+	mockStorage.On("SetCounter", mock.Anything, mock.Anything).Return([]*m.Metrics{resultCounterMetric}, nil)
+	mockStorage.On("GetMetrics", mock.Anything, "counter", "TestCounter").Return(resultCounterMetric, true)
+
+	mockStorage.On("GetAllMetrics").Return([]string{
+		"gauge:TestGauge=123.45",
+		"counter:TestCounter=42",
+	})
+
+	t.Run("SetGauge", func(t *testing.T) {
+		updatedMetrics, err := mockStorage.SetGauge(ctx, gaugeMetric)
+		require.NoError(t, err)
+		require.Len(t, updatedMetrics, 1)
+		assert.Equal(t, "TestGauge", updatedMetrics[0].ID)
+		assert.Equal(t, "gauge", updatedMetrics[0].MType)
+		assert.Equal(t, value, *updatedMetrics[0].Value)
+	})
+
+	t.Run("GetGaugeMetric", func(t *testing.T) {
+		metric, found := mockStorage.GetMetrics(ctx, "gauge", "TestGauge")
+		assert.True(t, found)
+		assert.Equal(t, "TestGauge", metric.ID)
+		assert.Equal(t, "gauge", metric.MType)
+		assert.Equal(t, value, *metric.Value)
+	})
+
+	t.Run("SetCounter", func(t *testing.T) {
+		updatedMetrics, err := mockStorage.SetCounter(ctx, counterMetric)
+		require.NoError(t, err)
+		require.Len(t, updatedMetrics, 1)
+		assert.Equal(t, "TestCounter", updatedMetrics[0].ID)
+		assert.Equal(t, "counter", updatedMetrics[0].MType)
+		assert.Equal(t, delta, *updatedMetrics[0].Delta)
+	})
+
+	t.Run("GetCounterMetric", func(t *testing.T) {
+		metric, found := mockStorage.GetMetrics(ctx, "counter", "TestCounter")
+		assert.True(t, found)
+		assert.Equal(t, "TestCounter", metric.ID)
+		assert.Equal(t, "counter", metric.MType)
+		assert.Equal(t, delta, *metric.Delta)
+	})
+
+	t.Run("GetAllMetrics", func(t *testing.T) {
+		metrics := mockStorage.GetAllMetrics()
+		assert.Len(t, metrics, 2)
+		assert.Contains(t, metrics, "gauge:TestGauge=123.45")
+		assert.Contains(t, metrics, "counter:TestCounter=42")
+	})
+
+	mockStorage.AssertExpectations(t)
+}
+
+func TestEnsureMetricsTableExists(t *testing.T) {
+	mockStorage := mocks.NewStorageHelper(t)
+	ctx := context.Background()
+
+	t.Run("success", func(t *testing.T) {
+		mockStorage.On("EnsureMetricsTableExists", ctx).Return(nil).Once()
+
+		err := mockStorage.EnsureMetricsTableExists(ctx)
+		assert.NoError(t, err)
+		mockStorage.AssertExpectations(t)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		mockStorage.On("EnsureMetricsTableExists", ctx).Return(assert.AnError).Once()
+
+		err := mockStorage.EnsureMetricsTableExists(ctx)
+		assert.Error(t, err)
+		mockStorage.AssertExpectations(t)
+	})
 }

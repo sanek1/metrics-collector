@@ -6,11 +6,12 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"go.uber.org/zap"
+
 	sc "github.com/sanek1/metrics-collector/internal/controller/server"
 	sf "github.com/sanek1/metrics-collector/internal/flags/server"
 	ss "github.com/sanek1/metrics-collector/internal/storage/server"
 	"github.com/sanek1/metrics-collector/pkg/logging"
-	"go.uber.org/zap"
 )
 
 type App struct {
@@ -61,6 +62,11 @@ func (a *App) Run() error {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	l.InfoCtx(ctx, "Running server", zap.String("address%s", a.options.FlagRunAddr))
-	return server.ListenAndServe()
+	l.InfoCtx(ctx, "Running server"+a.options.FlagRunAddr, zap.String("address%s", a.options.FlagRunAddr))
+
+	err = server.ListenAndServe()
+	if err != nil {
+		l.FatalCtx(ctx, "Failed to start server", zap.Error(err))
+	}
+	return nil
 }

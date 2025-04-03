@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sync"
+
+	"go.uber.org/zap"
 
 	flags "github.com/sanek1/metrics-collector/internal/flags/agent"
 	m "github.com/sanek1/metrics-collector/internal/models"
 	services "github.com/sanek1/metrics-collector/internal/services/agent"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
-	"go.uber.org/zap"
 )
 
 type Controller struct {
@@ -54,14 +56,39 @@ func (c *Controller) SendingGaugeMetrics(ctx context.Context, metrics map[string
 		return
 	}
 
+	var wg sync.WaitGroup
+	concurrency := 10
+	sem := make(chan struct{}, concurrency)
+
 	for _, gauge := range metricGauges {
-		metricURL := &url.URL{
-			Scheme: "http",
-			Host:   c.opt.FlagRunAddr,
-			Path:   fmt.Sprintf("/update/gauge/%s/%f", gauge.ID, *gauge.Value),
-		}
-		if err := c.s.SendToServerMetric(ctx, client, metricURL.String(), gauge); err != nil {
-			c.l.InfoCtx(ctx, "message", zap.String("SendingGaugeMetrics", fmt.Sprintf("Error reporting metrics%v", err)))
-		}
+		wg.Add(1)
+		sem <- struct{}{}
+
+		go func(g m.Metrics) {
+			defer func() {
+				<-sem
+				wg.Done()
+			}()
+
+			metricURL := &url.URL{
+				Scheme: "http",
+				Host:   c.opt.FlagRunAddr,
+				Path:   fmt.Sprintf("/update/gauge/%s/%f", gauge.ID, *gauge.Value),
+			}
+
+			if err := c.s.SendToServerMetric(
+				ctx,
+				client,
+				metricURL.String(),
+				g,
+			); err != nil {
+				c.l.InfoCtx(ctx, "gauge metric send failed",
+					zap.String("metric", g.ID),
+					zap.Error(err),
+				)
+			}
+		}(gauge)
 	}
+
+	wg.Wait()
 }

@@ -8,11 +8,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
+
 	flags "github.com/sanek1/metrics-collector/internal/flags/agent"
 	m "github.com/sanek1/metrics-collector/internal/models"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
 )
 
 func Test_reportClient(t *testing.T) {
