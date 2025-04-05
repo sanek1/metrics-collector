@@ -1,3 +1,4 @@
+// Package controller представляет собой библиотеку контроллеров агента
 package controller
 
 import (

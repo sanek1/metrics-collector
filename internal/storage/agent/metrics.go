@@ -1,6 +1,4 @@
-//go:build !test
-// +build !test
-
+// package storage
 package storage
 
 import (
