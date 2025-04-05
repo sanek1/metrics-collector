@@ -1,3 +1,4 @@
+// package services
 package services
 
 import (
@@ -86,7 +87,7 @@ func (s Services) sendToServer(ctx context.Context, client *http.Client, req *ht
 
 	defer func() {
 		_, _ = io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}()
 
 	if err := s.processingResponseServer(ctx, resp); err != nil {

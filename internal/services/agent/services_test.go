@@ -56,7 +56,7 @@ func Test_reportClient(t *testing.T) {
 
 	testServer := httptest.NewServer(
 		http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-			fmt.Fprintln(rw, "")
+			_, _ = fmt.Fprintln(rw, "")
 			rw.Header().Set("Content-Type", "application/json")
 			rw.Header().Set("content-encoding", "")
 			rw.Header().Set("Accept-Encoding", "")

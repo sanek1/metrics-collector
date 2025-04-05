@@ -1,8 +1,9 @@
 package main
 
 import (
-	"log"
+	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	_ "net/http/pprof"
@@ -23,6 +24,18 @@ const (
 // @host localhost:8080
 // @BasePath /
 func main() {
+	code := run()
+	if code != 0 {
+		if err := os.Setenv("EXIT_CODE", fmt.Sprintf("%d", code)); err != nil {
+			fmt.Fprintf(os.Stderr, "not set EXIT_CODE: %v\n", err)
+		}
+		return
+	}
+}
+
+func run() int {
+	errCh := make(chan error, 2)
+
 	go func() {
 		server := &http.Server{
 			Addr:         "localhost:6060",
@@ -32,13 +45,19 @@ func main() {
 			IdleTimeout:  idleTimeout,
 		}
 		err := server.ListenAndServe()
-		if err != nil {
-			log.Fatal(err)
+		if err != nil && err != http.ErrServerClosed {
+			errCh <- fmt.Errorf("error running profiler: %w", err)
 		}
 	}()
 
 	opt := flags.ParseServerFlags()
-	if err := app.New(opt, opt.UseDatabase).Run(); err != nil {
-		log.Fatal(err)
-	}
+	go func() {
+		if err := app.New(opt, opt.UseDatabase).Run(); err != nil {
+			errCh <- fmt.Errorf("error running server: %w", err)
+		}
+	}()
+
+	err := <-errCh
+	fmt.Fprintf(os.Stderr, "critical error: %v\n", err)
+	return 1
 }

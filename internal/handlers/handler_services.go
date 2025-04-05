@@ -1,3 +1,4 @@
+// Package handlers представляет собой библиотеку обработки HTTP-запросов к метрикам.
 package handlers
 
 import (
@@ -20,9 +21,10 @@ import (
 // Реализует бизнес-логику для работы с различными типами метрик
 // и обеспечивает взаимодействие между хранилищем и HTTP-обработчиками.
 type Services struct {
-	s      storage.Storage
-	models *[]m.Metrics
-	logger *l.ZapLogger
+	s       storage.Storage
+	models  *[]m.Metrics
+	logger  *l.ZapLogger
+	hashKey *string
 }
 
 // HServices определяет интерфейс сервисов обработки метрик.
@@ -53,11 +55,12 @@ type HServices interface {
 //
 // Возвращает:
 //   - указатель на новый экземпляр Services
-func NewHandlerServices(st storage.Storage, models *[]m.Metrics, zl *l.ZapLogger) *Services {
+func NewHandlerServices(st storage.Storage, hashKey *string, zl *l.ZapLogger) *Services {
 	return &Services{
-		s:      st,
-		models: models,
-		logger: zl,
+		s:       st,
+		models:  nil,
+		logger:  zl,
+		hashKey: hashKey,
 	}
 }
 
@@ -116,6 +119,87 @@ func (s *Services) MetricsService(c *gin.Context, models ...*m.Metrics) {
 	c.JSON(http.StatusOK, models)
 }
 
+// SetMetricsByBodyGin обрабатывает запрос на установку значения метрики через JSON API.
+// Разбирает метрику из тела запроса, устанавливает её значение и возвращает результат.
+func (s *Services) SetMetricsByBodyGin(c *gin.Context) {
+	bodyBytes, err := c.GetRawData()
+	if err != nil {
+		s.logger.ErrorCtx(c.Request.Context(), "Failed to read request body", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Failed to read request body",
+		})
+		return
+	}
+	c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	var metric m.Metrics
+	if err := json.Unmarshal(bodyBytes, &metric); err != nil {
+		s.logger.ErrorCtx(c.Request.Context(), "Failed to parse metric",
+			zap.Error(err),
+			zap.String("body", string(bodyBytes)))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid metric format",
+		})
+		return
+	}
+
+	if !s.CheckValue(&metric) {
+		s.logger.WarnCtx(c.Request.Context(), "Invalid metric value",
+			zap.String("id", metric.ID),
+			zap.String("type", metric.MType))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid metric value",
+		})
+		return
+	}
+
+	var updatedMetrics []*m.Metrics
+	var err2 error
+
+	switch metric.MType {
+	case m.TypeGauge:
+		updatedMetrics, err2 = s.s.SetGauge(c.Request.Context(), metric)
+	case m.TypeCounter:
+		updatedMetrics, err2 = s.s.SetCounter(c.Request.Context(), metric)
+	default:
+		s.logger.WarnCtx(c.Request.Context(), "Unsupported metric type",
+			zap.String("type", metric.MType))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Unsupported metric type",
+		})
+		return
+	}
+
+	if err2 != nil {
+		s.logger.ErrorCtx(c.Request.Context(), "Failed to set metric", zap.Error(err2))
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to set metric",
+		})
+		return
+	}
+
+	if len(updatedMetrics) > 0 {
+		c.JSON(http.StatusOK, updatedMetrics[0])
+		return
+	}
+
+	c.JSON(http.StatusOK, metric)
+}
+
+// CheckValue проверяет правильность значения метрики.
+// Проверяет, что тип метрики поддерживается и значение соответствует типу.
+// Возвращает true, если метрика корректна, иначе false.
+func (s *Services) CheckValue(metric *m.Metrics) bool {
+	switch metric.MType {
+	case m.TypeGauge:
+		return metric.Value != nil
+	case m.TypeCounter:
+		return metric.Delta != nil
+	default:
+		return false
+	}
+}
+
 // ParseMetricsServices разбирает метрики из тела HTTP-запроса.
 // Поддерживает разбор как одиночной метрики, так и массива метрик в формате JSON.
 // Также поддерживает сжатие gzip.
@@ -160,7 +244,9 @@ func (s *Services) ParseMetricsServices(c *gin.Context) ([]m.Metrics, error) {
 			return nil, fmt.Errorf("unmarshal: %w", err)
 		}
 	}
-	defer r.Body.Close()
+	defer func() {
+		_ = r.Body.Close()
+	}()
 
 	if model != (m.Metrics{}) {
 		models = append(models, model)

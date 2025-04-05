@@ -1,3 +1,4 @@
+// Package config представляет собой конфигурацию метрик
 package config
 
 const (

@@ -1,3 +1,4 @@
+// Package app
 package app
 
 import (
@@ -67,12 +68,12 @@ func (a *App) startAgent(ctx context.Context) error {
 			as.InitPoolMetrics(metrics)
 			as.GetGopsuiteMetrics(gpMetrics)
 		case <-reportTick.C:
-			fmt.Fprintf(os.Stdout, "--------- start response ---------\n\n")
+			_, _ = fmt.Fprintf(os.Stdout, "--------- start response ---------\n\n")
 			a.controller.SendingCounterMetrics(ctx, &pollCount, client)
 			a.controller.SendingGaugeMetrics(ctx, metrics, client)
 			a.controller.SendingGaugeMetrics(ctx, gpMetrics, client)
-			fmt.Fprintf(os.Stdout, "--------- end response ---------\n\n")
-			fmt.Fprintf(os.Stdout, "--------- NEW ITERATION %d ---------> \n\n", pollCount)
+			_, _ = fmt.Fprintf(os.Stdout, "--------- end response ---------\n\n")
+			_, _ = fmt.Fprintf(os.Stdout, "--------- NEW ITERATION %d ---------> \n\n", pollCount)
 		}
 	}
 }

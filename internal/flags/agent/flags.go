@@ -1,3 +1,4 @@
+// package flags
 package flags
 
 import (

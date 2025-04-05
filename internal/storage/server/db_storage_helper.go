@@ -102,10 +102,12 @@ func (s *DBStorage) UpdateMetrics(ctx context.Context, models []m.Metrics) error
 	}
 
 	br := s.conn.SendBatch(ctx, batch)
-	defer br.Close()
+	defer func() {
+		_ = br.Close()
+	}()
 
 	var err error
-	if _, err := br.Exec(); err != nil {
+	if _, err = br.Exec(); err != nil {
 		s.Logger.ErrorCtx(ctx, "failed to execute batch request:  %w"+err.Error(), zap.Error(err))
 	}
 	return err
@@ -115,6 +117,7 @@ func (s *DBStorage) InsertMetric(ctx context.Context, models []m.Metrics) error 
 	if err != nil {
 		return fmt.Errorf("failed to acquire connection: %w", err)
 	}
+
 	defer conn.Release()
 
 	batch := &pgx.Batch{}
@@ -123,7 +126,9 @@ func (s *DBStorage) InsertMetric(ctx context.Context, models []m.Metrics) error 
 	}
 
 	br := s.conn.SendBatch(ctx, batch)
-	defer br.Close()
+	defer func() {
+		_ = br.Close()
+	}()
 
 	for i := 0; i < batch.Len(); i++ {
 		_, err := br.Exec()
@@ -187,13 +192,13 @@ func (s *DBStorage) SetMetrics(ctx context.Context, models ...m.Metrics) ([]*m.M
 	updatingBatch, insertingBatch := SortingBatchData(existingMetrics, models)
 
 	if len(updatingBatch) != 0 {
-		if err := s.UpdateMetrics(ctx, updatingBatch); err != nil {
+		if err = s.UpdateMetrics(ctx, updatingBatch); err != nil {
 			s.Logger.ErrorCtx(ctx, "failed to update metric", zap.Error(err))
 			return nil, err
 		}
 	}
 	if len(insertingBatch) != 0 {
-		if err := s.InsertMetric(ctx, insertingBatch); err != nil {
+		if err = s.InsertMetric(ctx, insertingBatch); err != nil {
 			s.Logger.ErrorCtx(ctx, "failed to insert metric", zap.Error(err))
 			return nil, err
 		}

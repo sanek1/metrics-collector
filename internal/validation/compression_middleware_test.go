@@ -29,7 +29,9 @@ func TestGzipMiddleware(t *testing.T) {
 		assert.Equal(t, "gzip", resp.Header().Get("Content-Encoding"))
 		gr, err := gzip.NewReader(resp.Body)
 		require.NoError(t, err)
-		defer gr.Close()
+		defer func() {
+			_ = gr.Close()
+		}()
 
 		body, err := io.ReadAll(gr)
 		require.NoError(t, err)

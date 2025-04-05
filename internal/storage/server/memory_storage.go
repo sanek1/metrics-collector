@@ -1,3 +1,4 @@
+// Package storage представляет собой библиотеку хранилища метрик
 package storage
 
 import (

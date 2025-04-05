@@ -1,3 +1,4 @@
+// Package app представляет собой основную библиотеку приложения
 package app
 
 import (
@@ -48,7 +49,7 @@ func (a *App) Run() error {
 		go fs.PeriodicallySaveBackUp(ctx, a.options.Path, a.options.Restore, time.Duration(a.options.StoreInterval)*time.Second)
 	}
 	if dbs, ok := storage.(ss.DatabaseStorage); ok {
-		if err := dbs.EnsureMetricsTableExists(ctx); err != nil {
+		if err = dbs.EnsureMetricsTableExists(ctx); err != nil {
 			l.ErrorCtx(ctx, "failed to ensure Metrics table exists", zap.Error(err))
 		}
 	}

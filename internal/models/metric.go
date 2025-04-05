@@ -1,4 +1,4 @@
-//gocover:ignore-file
+// Package models предоставляет интерфейсы для работы с метриками
 package models
 
 // Типы метрик
