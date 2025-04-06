@@ -68,7 +68,7 @@ import (
 func main() {
 	os.Setenv("GODEBUG", "analysisnoverify=1")
 	if len(os.Args) > 1 && os.Args[1] == "exitchecker" && len(os.Args) > 2 {
-		fmt.Println("Запуск только анализатора exitchecker...")
+		fmt.Println("running only exitchecker...")
 		mychecks := []*analysis.Analyzer{exitchecker.Analyzer}
 		os.Args = append(os.Args[:1], os.Args[2:]...)
 		multichecker.Main(mychecks...)
@@ -127,7 +127,7 @@ func main() {
 	mychecks = append(mychecks, errcheck.Analyzer)
 
 	mychecks = append(mychecks, exitchecker.Analyzer)
-	fmt.Println("Анализатор exitchecker добавлен:", exitchecker.Analyzer.Name)
+	fmt.Println("analyzer exitchecker added:", exitchecker.Analyzer.Name)
 
 	multichecker.Main(
 		mychecks...,

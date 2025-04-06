@@ -6,9 +6,6 @@ import (
 )
 
 func main() {
-	os.Exit(0)
+	os.Exit(0) // want "os.Exit not allowed in main"
 }
 
-func otherFunc() {
-	os.Exit(1)
-}

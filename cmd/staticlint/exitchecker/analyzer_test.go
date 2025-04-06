@@ -12,7 +12,7 @@ func TestAnalyzer(t *testing.T) {
 	os.Setenv("GODEBUG", "analysisnoverify=1")
 	testdata := analysistest.TestData()
 	t.Logf("path to testdata: %s", testdata)
-	
+
 	t.Logf("checking package 'a'...")
 	analysistest.Run(t, testdata, exitchecker.Analyzer, "a")
 

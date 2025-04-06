@@ -8,7 +8,7 @@ import (
 
 func main() {
 	code := run()
-	os.Exit(code)
+	os.Exit(code) // want "os.Exit not allowed in main"
 }
 
 func run() int {
