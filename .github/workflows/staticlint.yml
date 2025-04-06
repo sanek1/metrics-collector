@@ -23,7 +23,7 @@ jobs:
 
       - name: Build staticlint
         run: |
-          go build -buildvcs=false -o staticlint ./cmd/staticlint/...
+          go build -buildvcs=false -o staticlint ./cmd/staticlint
 
       - name: Run staticlint
         run: |
