@@ -22,11 +22,15 @@ jobs:
           go mod download
           go mod tidy
 
+      - name: Configure Git safe directory
+        run: |
+          git config --global --add safe.directory "$(pwd)"
+
       - name: Build and run staticlint analyzer
         id: staticlint
         run: |
           echo "::group::Building staticlint analyzer"
-          go build -v -o staticlint ./cmd/staticlint
+          go build -buildvcs=false -v -o staticlint ./cmd/staticlint
           echo "::endgroup::"
           
           echo "::group::Running staticlint analysis"
