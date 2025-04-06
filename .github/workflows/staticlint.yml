@@ -1,0 +1,45 @@
+name: staticlint analysis
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  staticlint:
+    name: Static Code Analysis
+    runs-on: ubuntu-latest
+    container: golang:1.23
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          go mod download
+          go mod tidy
+
+      - name: Build staticlint
+        run: |
+          go build -buildvcs=false -o staticlint ./cmd/staticlint/...
+
+      - name: Run staticlint
+        run: |
+          ./staticlint ./...
+          
+      - name: Run exitchecker separately
+        run: |
+          ./staticlint exitchecker ./...
+          
+      - name: Run tests for static analyzer
+        run: |
+          go test -v -coverprofile=staticlint-coverage.out ./cmd/staticlint/...
+          go tool cover -func=staticlint-coverage.out
+          
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: staticlint-coverage
+          path: staticlint-coverage.out 
