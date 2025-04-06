@@ -1,4 +1,4 @@
-// package flags
+// Package flags предоставляет функциональность для работы с флагами командной строки агента
 package flags
 
 import (

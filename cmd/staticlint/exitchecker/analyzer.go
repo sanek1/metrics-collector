@@ -1,42 +1,54 @@
-// Package exitchecker содержит анализатор, который запрещает использование прямого вызова os.Exit
-// в функции main пакета main.
+// Package exitchecker implements a checker that detects direct calls to os.Exit from
+// the main function in main packages. This function should be isolated to allow
+// for better testability of the application.
 package exitchecker
 
 import (
 	"go/ast"
+	"path/filepath"
+	"regexp"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/ast/inspector"
 )
 
+// Analyzer entry point for the analyzer. Detects direct calls to os.Exit from
+// the main function in main packages.
 var Analyzer = &analysis.Analyzer{
 	Name: "exitchecker",
-	Doc:  "check for direct os.Exit calls in main function of main package",
-	Requires: []*analysis.Analyzer{
-		inspect.Analyzer,
-	},
-	Run: run,
+	Doc:  "check for direct os.Exit calls in main",
+	Run:  run,
 }
 
-func run(pass *analysis.Pass) (interface{}, error) {
-	inspect := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
+// Регулярное выражение для определения файлов из кэша сборки
+var goBuildCachePattern = regexp.MustCompile(`(go-build|AppData[\\/]Local[\\/]go-build|[\\/]tmp[\\/]go-build)`)
 
-	if pass.Pkg.Name() != "main" {
-		return nil, nil
-	}
+func run(pass *analysis.Pass) (interface{}, error) {
+	inspect := inspector.New(pass.Files)
 
 	nodeFilter := []ast.Node{
 		(*ast.FuncDecl)(nil),
 	}
+
 	inspect.Preorder(nodeFilter, func(n ast.Node) {
-		mainFunc, ok := n.(*ast.FuncDecl)
-		if !ok || mainFunc.Name.Name != "main" {
+		pos := pass.Fset.Position(n.Pos())
+		filename := filepath.Clean(pos.Filename)
+
+		if isInBuildCache(filename) {
 			return
 		}
 
-		ast.Inspect(mainFunc.Body, func(node ast.Node) bool {
-			call, ok := node.(*ast.CallExpr)
+		if pass.Pkg.Name() != "main" {
+			return
+		}
+
+		fd := n.(*ast.FuncDecl)
+		if fd.Name.Name != "main" {
+			return
+		}
+
+		ast.Inspect(fd.Body, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
 			if !ok {
 				return true
 			}
@@ -46,18 +58,20 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				return true
 			}
 
-			pkg, ok := sel.X.(*ast.Ident)
-			if !ok {
+			ident, ok := sel.X.(*ast.Ident)
+			if !ok || ident.Name != "os" || sel.Sel.Name != "Exit" {
 				return true
 			}
 
-			if pkg.Name == "os" && sel.Sel.Name == "Exit" {
-				pass.Reportf(call.Pos(), "os.Exit not allowed in main")
-			}
-
+			pass.Reportf(call.Pos(), "os.Exit not allowed in main")
 			return true
 		})
 	})
 
 	return nil, nil
+}
+
+func isInBuildCache(filename string) bool {
+	normalizedPath := filepath.ToSlash(filename)
+	return goBuildCachePattern.MatchString(normalizedPath)
 }

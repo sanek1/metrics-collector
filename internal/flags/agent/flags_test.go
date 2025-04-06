@@ -19,21 +19,21 @@ func TestParseFlags(t *testing.T) {
 	defer func() {
 		os.Args = oldArgs
 		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-		os.Setenv("ADDRESS", oldAddr)
-		os.Setenv("REPORT_INTERVAL", oldReport)
-		os.Setenv("POLL_INTERVAL", oldPoll)
-		os.Setenv("KEY", oldKey)
-		os.Setenv("RATE_LIMIT", oldLimit)
+		_=os.Setenv("ADDRESS", oldAddr)
+		_=os.Setenv("REPORT_INTERVAL", oldReport)
+		_=os.Setenv("POLL_INTERVAL", oldPoll)
+		_=os.Setenv("KEY", oldKey)
+		_=os.Setenv("RATE_LIMIT", oldLimit)
 	}()
 
 	t.Run("default values", func(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ExitOnError)
 		os.Args = []string{"test"}
-		os.Unsetenv("ADDRESS")
-		os.Unsetenv("REPORT_INTERVAL")
-		os.Unsetenv("POLL_INTERVAL")
-		os.Unsetenv("KEY")
-		os.Unsetenv("RATE_LIMIT")
+		_=os.Unsetenv("ADDRESS")
+		_=os.Unsetenv("REPORT_INTERVAL")
+		_=os.Unsetenv("POLL_INTERVAL")
+		_=os.Unsetenv("KEY")
+		_=os.Unsetenv("RATE_LIMIT")
 
 		opt := ParseFlags()
 		assert.Equal(t, ":8080", opt.FlagRunAddr)
@@ -46,11 +46,11 @@ func TestParseFlags(t *testing.T) {
 	t.Run("command line flags", func(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ExitOnError)
 		os.Args = []string{"test", "-a", ":9090", "-k", "testkey", "-r", "20", "-p", "5", "-l", "10"}
-		os.Unsetenv("ADDRESS")
-		os.Unsetenv("REPORT_INTERVAL")
-		os.Unsetenv("POLL_INTERVAL")
-		os.Unsetenv("KEY")
-		os.Unsetenv("RATE_LIMIT")
+		_=os.Unsetenv("ADDRESS")
+		_=os.Unsetenv("REPORT_INTERVAL")
+		_=os.Unsetenv("POLL_INTERVAL")
+		_=os.Unsetenv("KEY")
+		_=os.Unsetenv("RATE_LIMIT")
 
 		opt := ParseFlags()
 		assert.Equal(t, ":9090", opt.FlagRunAddr)
@@ -63,11 +63,11 @@ func TestParseFlags(t *testing.T) {
 	t.Run("environment variables", func(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ExitOnError)
 		os.Args = []string{"test"}
-		os.Setenv("ADDRESS", ":7070")
-		os.Setenv("REPORT_INTERVAL", "30")
-		os.Setenv("POLL_INTERVAL", "7")
-		os.Setenv("KEY", "envkey")
-		os.Setenv("RATE_LIMIT", "5")
+		_=os.Setenv("ADDRESS", ":7070")
+		_=os.Setenv("REPORT_INTERVAL", "30")
+		_=os.Setenv("POLL_INTERVAL", "7")
+		_=os.Setenv("KEY", "envkey")
+		_=os.Setenv("RATE_LIMIT", "5")
 
 		opt := ParseFlags()
 		assert.Equal(t, ":7070", opt.FlagRunAddr)
@@ -80,11 +80,11 @@ func TestParseFlags(t *testing.T) {
 	t.Run("env overrides flags", func(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ExitOnError)
 		os.Args = []string{"test", "-a", ":9090", "-k", "testkey", "-r", "20", "-p", "5", "-l", "10"}
-		os.Setenv("ADDRESS", ":7070")
-		os.Setenv("REPORT_INTERVAL", "30")
-		os.Setenv("POLL_INTERVAL", "7")
-		os.Setenv("KEY", "envkey")
-		os.Setenv("RATE_LIMIT", "5")
+		_=os.Setenv("ADDRESS", ":7070")
+		_=os.Setenv("REPORT_INTERVAL", "30")
+		_=os.Setenv("POLL_INTERVAL", "7")
+		_=os.Setenv("KEY", "envkey")
+		_=os.Setenv("RATE_LIMIT", "5")
 
 		opt := ParseFlags()
 		assert.Equal(t, ":7070", opt.FlagRunAddr)

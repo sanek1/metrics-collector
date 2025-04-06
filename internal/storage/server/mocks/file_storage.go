@@ -1,4 +1,4 @@
-// package: storage
+// Package mocks содержит моки для тестирования серверного хранилища
 package mocks
 
 import (

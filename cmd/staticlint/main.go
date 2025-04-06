@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 
@@ -61,14 +62,26 @@ import (
 //	go run ./cmd/staticlint/... ./...   - проверка всего проекта
 //	go run ./cmd/staticlint/... ./pkg/... - проверка только конкретных пакетов
 //
-// 	поддеживаемые флаги
+//	поддеживаемые флаги
 //	-explain - показать подробное объяснение для каждой проблемы
 //	-fix - автоматически исправить некоторые проблемы, если возможно
 //	-json - форматировать вывод в формате JSON
 func main() {
-	os.Setenv("GODEBUG", "analysisnoverify=1")
-	if len(os.Args) > 1 && os.Args[1] == "exitchecker" && len(os.Args) > 2 {
+	_ = os.Setenv("GODEBUG", "analysisnoverify=1")
+
+	var exitcheckerOnly bool
+	flag.BoolVar(&exitcheckerOnly, "exitchecker", false, "Run only exitchecker analyzer")
+	flag.Parse()
+
+	if exitcheckerOnly {
 		fmt.Println("running only exitchecker...")
+		mychecks := []*analysis.Analyzer{exitchecker.Analyzer}
+		multichecker.Main(mychecks...)
+		return
+	}
+
+	if len(os.Args) > 1 && os.Args[1] == "exitchecker" && len(os.Args) > 2 {
+		fmt.Println("running only exitchecker (legacy mode)...")
 		mychecks := []*analysis.Analyzer{exitchecker.Analyzer}
 		os.Args = append(os.Args[:1], os.Args[2:]...)
 		multichecker.Main(mychecks...)

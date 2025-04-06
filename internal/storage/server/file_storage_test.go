@@ -176,7 +176,7 @@ func TestSaveAndLoadFromFile(t *testing.T) {
 
 	t.Run("SaveToFileWithError", func(t *testing.T) {
 		invalidPath := filepath.Join(tempDir, "invalid_dir", "file.json")
-		os.MkdirAll(filepath.Dir(invalidPath), 0755)
+		_=os.MkdirAll(filepath.Dir(invalidPath), 0755)
 
 		err := mockFileStorage.SaveToFile(invalidPath)
 		assert.Error(t, err)

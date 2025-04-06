@@ -9,7 +9,7 @@ import (
 )
 
 func TestAnalyzer(t *testing.T) {
-	os.Setenv("GODEBUG", "analysisnoverify=1")
+	_ = os.Setenv("GODEBUG", "analysisnoverify=1")
 	testdata := analysistest.TestData()
 	t.Logf("path to testdata: %s", testdata)
 

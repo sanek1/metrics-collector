@@ -1,4 +1,4 @@
-// package services
+// Package services предоставляет сервисные функции для работы агента по отправке метрик
 package services
 
 import (

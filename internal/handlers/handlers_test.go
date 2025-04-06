@@ -33,8 +33,8 @@ func TestMainPageHandler(t *testing.T) {
 	value2 := int64(42)
 
 	ctx := context.Background()
-	s.SetGauge(ctx, m.Metrics{ID: "gauge1", MType: "gauge", Value: &value1})
-	s.SetCounter(ctx, m.Metrics{ID: "counter1", MType: "counter", Delta: &value2})
+	_, _ = s.SetGauge(ctx, m.Metrics{ID: "gauge1", MType: "gauge", Value: &value1})
+	_, _ = s.SetCounter(ctx, m.Metrics{ID: "counter1", MType: "counter", Delta: &value2})
 
 	req, _ := http.NewRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
@@ -58,8 +58,8 @@ func TestGetMetricsByNameHandler(t *testing.T) {
 	gaugeValue := float64(123.45)
 	counterValue := int64(42)
 	ctx := context.Background()
-	s.SetGauge(ctx, m.Metrics{ID: "test_gauge", MType: "gauge", Value: &gaugeValue})
-	s.SetCounter(ctx, m.Metrics{ID: "test_counter", MType: "counter", Delta: &counterValue})
+	_, _ = s.SetGauge(ctx, m.Metrics{ID: "test_gauge", MType: "gauge", Value: &gaugeValue})
+	_, _ = s.SetCounter(ctx, m.Metrics{ID: "test_counter", MType: "counter", Delta: &counterValue})
 
 	tests := []struct {
 		name           string
@@ -216,7 +216,7 @@ func TestGetMetricsByValueHandler(t *testing.T) {
 
 	gaugeValue := float64(123.45)
 	ctx := context.Background()
-	s.SetGauge(ctx, m.Metrics{ID: "test_gauge", MType: "gauge", Value: &gaugeValue})
+	_, _ = s.SetGauge(ctx, m.Metrics{ID: "test_gauge", MType: "gauge", Value: &gaugeValue})
 
 	metricRequest := m.Metrics{
 		ID:    "test_gauge",
@@ -259,7 +259,9 @@ func TestSaveToFile(t *testing.T) {
 
 	err := os.MkdirAll("./testdata", 0755)
 	assert.NoError(t, err)
-	defer os.RemoveAll("./testdata")
+	defer func() {
+		_ = os.RemoveAll("./testdata")
+	}()
 
 	err = memStorage.SaveToFile("./testdata/test.json")
 	assert.NoError(t, err)

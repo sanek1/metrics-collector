@@ -1,4 +1,4 @@
-// package storage
+// Package storage предоставляет функции для работы с метриками агента
 package storage
 
 import (

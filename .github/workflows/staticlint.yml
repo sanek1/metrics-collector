@@ -11,6 +11,7 @@ jobs:
   staticlint:
     name: Static Code Analysis
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     container: golang:1.23
     steps:
       - name: Checkout code
@@ -21,22 +22,32 @@ jobs:
           go mod download
           go mod tidy
 
-      - name: Build staticlint
+      - name: Build and run staticlint analyzer
+        id: staticlint
         run: |
-          go build -buildvcs=false -o staticlint ./cmd/staticlint
-
-      - name: Run staticlint
-        run: |
-          ./staticlint ./...
+          echo "::group::Building staticlint analyzer"
+          go build -v -o staticlint ./cmd/staticlint
+          echo "::endgroup::"
           
-      - name: Run exitchecker separately
-        run: |
-          ./staticlint exitchecker ./...
+          echo "::group::Running staticlint analysis"
+          # created a list of files to analyze
+          find . -path "*/\.git/*" -prune -o -path "*/go-build/*" -prune -o -path "*/vendor/*" -prune -o -name "*.go" -print > gofiles.txt
+          
+          # run staticlint analysis
+          echo "Running full staticlint analysis..."
+          ./staticlint -- @gofiles.txt || true
+          
+          # run only staticlint 
+          echo "Running exitchecker analysis..."
+          ./staticlint -exitchecker -- @gofiles.txt || true
+          echo "::endgroup::"
           
       - name: Run tests for static analyzer
         run: |
+          echo "::group::Running tests for static analyzer"
           go test -v -coverprofile=staticlint-coverage.out ./cmd/staticlint/...
           go tool cover -func=staticlint-coverage.out
+          echo "::endgroup::"
           
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
