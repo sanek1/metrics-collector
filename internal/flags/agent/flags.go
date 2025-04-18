@@ -30,6 +30,7 @@ func ParseFlags() *Options {
 	flag.Int64Var(&opt.ReportInterval, "r", defaultReportInterval, "report interval in seconds")
 	flag.Int64Var(&opt.PollInterval, "p", defaultPollInterval, "poll interval in seconds")
 	flag.Int64Var(&opt.RateLimit, "l", defaultRateLimit, "outgoing requests to the server ")
+	flag.StringVar(&opt.CryptoKey, "crypto-key", "", "path to public key file for encryption")
 	flag.Parse()
 
 	if len(flag.Args()) > 0 {
@@ -51,6 +52,10 @@ func ParseFlags() *Options {
 
 	if key := os.Getenv("KEY"); key != "" {
 		opt.CryptoKey = key
+	}
+
+	if path := os.Getenv("CRYPTO_KEY"); path != "" {
+		opt.CryptoKey = path
 	}
 
 	if limit := os.Getenv("RATE_LIMIT"); limit != "" {

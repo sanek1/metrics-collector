@@ -20,10 +20,10 @@ func (m *mockServer) ListenAndServe() error {
 
 func TestNew(t *testing.T) {
 	options := &sf.ServerOptions{
-		FlagRunAddr:    ":8080",
-		Path:           "./tmp/metrics-db.json",
-		StoreInterval:  300,
-		Restore:        true,
+		FlagRunAddr:   ":8080",
+		Path:          "./tmp/metrics-db.json",
+		StoreInterval: 300,
+		Restore:       true,
 	}
 
 	app := New(options, false)
@@ -35,10 +35,10 @@ func TestNew(t *testing.T) {
 
 func TestApp_Run_MemoryStorage(t *testing.T) {
 	options := &sf.ServerOptions{
-		FlagRunAddr:    ":18080",
-		Path:           "./tmp/test-metrics.json",
-		StoreInterval:  1,
-		Restore:        false,
+		FlagRunAddr:   ":18080",
+		Path:          "./tmp/test-metrics.json",
+		StoreInterval: 1,
+		Restore:       false,
 	}
 	app := New(options, false)
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)

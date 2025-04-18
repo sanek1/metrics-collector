@@ -35,7 +35,9 @@ func NewRouting(s ss.Storage, opt *sf.ServerOptions, logger *l.ZapLogger) *Route
 		opt:     opt,
 	}
 
+	handlerServices := h.NewHandlerServices(s, &opt.CryptoKey, opt.CryptoKey, logger)
 	c.s = h.NewStorage(s, logger)
+	c.s.SetHandlerServices(handlerServices)
 	c.middleware = v.NewValidation(c.s, logger)
 	c.middlewareHash = v.NewHash(opt.CryptoKey)
 	return c

@@ -14,6 +14,8 @@ var (
 	buildCommit  string
 )
 
+const versionString = "N/A"
+
 func main() {
 	printBuildInfo()
 
@@ -29,17 +31,17 @@ func main() {
 func printBuildInfo() {
 	version := buildVersion
 	if version == "" {
-		version = "N/A"
+		version = versionString
 	}
 
 	date := buildDate
 	if date == "" {
-		date = "N/A"
+		date = versionString
 	}
 
 	commit := buildCommit
 	if commit == "" {
-		commit = "N/A"
+		commit = versionString
 	}
 
 	fmt.Printf("Build version: %s\n", version)

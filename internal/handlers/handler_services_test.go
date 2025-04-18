@@ -24,7 +24,8 @@ func TestNewHandlerServices(t *testing.T) {
 	logger, _ := l.NewZapLogger(zap.InfoLevel)
 	s := storage.GetStorage(false, nil, logger)
 	hashKey := "test-key"
-	services := NewHandlerServices(s, &hashKey, logger)
+	cryptoKey := ""
+	services := NewHandlerServices(s, &hashKey, cryptoKey, logger)
 	assert.NotNil(t, services)
 	assert.Equal(t, s, services.s)
 	assert.Equal(t, hashKey, *services.hashKey)
@@ -54,7 +55,7 @@ func TestSetMetricsByBodyGin(t *testing.T) {
 	returnedCounterMetric := &counterMetric
 	mockStorage.On("SetCounter", mock.Anything, counterMetric).Return([]*m.Metrics{returnedCounterMetric}, nil)
 
-	services := NewHandlerServices(mockStorage, nil, logger)
+	services := NewHandlerServices(mockStorage, nil, "", logger)
 	t.Run("gauge metric", func(t *testing.T) {
 		jsonData, _ := json.Marshal(gaugeMetric)
 		req, _ := http.NewRequest("POST", "/update", bytes.NewBuffer(jsonData))
@@ -92,7 +93,6 @@ func TestSetMetricsByBodyGin(t *testing.T) {
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
 		services.SetMetricsByBodyGin(c)
-
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var respMetric m.Metrics
@@ -118,7 +118,7 @@ func TestGetMetricsByValueGin(t *testing.T) {
 	}
 
 	mockStorage.On("GetMetrics", mock.Anything, "gauge", "test_gauge").Return(&gaugeMetric, true)
-	services := NewHandlerServices(mockStorage, nil, logger)
+	services := NewHandlerServices(mockStorage, nil, "", logger)
 
 	t.Run("get existing metric", func(t *testing.T) {
 		request := m.Metrics{
@@ -152,7 +152,7 @@ func TestGetMetricsByValueGin(t *testing.T) {
 		mockStorage := mocks.NewStorage(t)
 		mockStorage.On("GetMetrics", mock.Anything, "gauge", "non_existent").Return(nil, false)
 
-		services := NewHandlerServices(mockStorage, nil, logger)
+		services := NewHandlerServices(mockStorage, nil, "", logger)
 		request := m.Metrics{
 			ID:    "non_existent",
 			MType: "gauge",
@@ -176,7 +176,7 @@ func TestGetMetricsByValueGin(t *testing.T) {
 func TestCheckValue(t *testing.T) {
 	logger, _ := l.NewZapLogger(zap.InfoLevel)
 	s := storage.GetStorage(false, nil, logger)
-	services := NewHandlerServices(s, nil, logger)
+	services := NewHandlerServices(s, nil, "", logger)
 
 	t.Run("check counter", func(t *testing.T) {
 		delta := int64(42)

@@ -2,8 +2,11 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -127,4 +130,168 @@ func TestGetMetrics(t *testing.T) {
 		_, ok := storage.GetMetrics(context.Background(), "", "unknown")
 		assert.False(t, ok)
 	})
+}
+
+func TestMetricsStorage_SaveToFile(t *testing.T) {
+	logger, _ := l.NewZapLogger(zap.InfoLevel)
+	ms := NewMetricsStorage(logger)
+
+	gaugeValue := float64(42.5)
+	counterValue := int64(100)
+
+	_, err := ms.SetGauge(context.Background(), m.Metrics{
+		ID:    "gauge1",
+		MType: "gauge",
+		Value: &gaugeValue,
+	})
+	require.NoError(t, err)
+
+	_, err = ms.SetCounter(context.Background(), m.Metrics{
+		ID:    "counter1",
+		MType: "counter",
+		Delta: &counterValue,
+	})
+	require.NoError(t, err)
+
+	tmpfile, err := os.CreateTemp("", "metrics_test_*.json")
+	require.NoError(t, err)
+	defer os.Remove(tmpfile.Name())
+
+	t.Run("SaveToFile", func(t *testing.T) {
+		err := ms.SaveToFile(tmpfile.Name())
+		require.NoError(t, err)
+
+		data, err := os.ReadFile(tmpfile.Name())
+		require.NoError(t, err)
+		assert.NotEmpty(t, data)
+
+		var metrics map[string]m.Metrics
+		err = json.Unmarshal(data, &metrics)
+		require.NoError(t, err)
+
+		assert.Len(t, metrics, 2)
+
+		gauge, ok := metrics["gauge1"]
+		assert.True(t, ok)
+		assert.Equal(t, "gauge", gauge.MType)
+		assert.Equal(t, gaugeValue, *gauge.Value)
+
+		counter, ok := metrics["counter1"]
+		assert.True(t, ok)
+		assert.Equal(t, "counter", counter.MType)
+		assert.Equal(t, counterValue, *counter.Delta)
+	})
+
+	t.Run("LoadFromFile", func(t *testing.T) {
+		newMS := NewMetricsStorage(logger)
+
+		err := newMS.LoadFromFile(tmpfile.Name())
+		require.NoError(t, err)
+
+		assert.Len(t, newMS.Metrics, 2)
+
+		gauge, ok := newMS.GetMetrics(context.Background(), "gauge", "gauge1")
+		assert.True(t, ok)
+		assert.Equal(t, "gauge", gauge.MType)
+		assert.Equal(t, gaugeValue, *gauge.Value)
+
+		counter, ok := newMS.GetMetrics(context.Background(), "counter", "counter1")
+		assert.True(t, ok)
+		assert.Equal(t, "counter", counter.MType)
+		assert.Equal(t, counterValue, *counter.Delta)
+	})
+
+	t.Run("LoadFromNonExistentFile", func(t *testing.T) {
+		newMS := NewMetricsStorage(logger)
+		err := newMS.LoadFromFile("completely_nonexistent_file_that_does_not_exist.json")
+		assert.Error(t, err)
+	})
+
+	t.Run("LoadFromInvalidJSONFile", func(t *testing.T) {
+		invalidJSONFile, err := os.CreateTemp("", "invalid_json_*.json")
+		require.NoError(t, err)
+		defer os.Remove(invalidJSONFile.Name())
+
+		_, err = invalidJSONFile.WriteString("invalid json content")
+		require.NoError(t, err)
+		err = invalidJSONFile.Close()
+		require.NoError(t, err)
+
+		newMS := NewMetricsStorage(logger)
+		err = newMS.LoadFromFile(invalidJSONFile.Name())
+		assert.Error(t, err)
+	})
+}
+
+func TestPeriodicallySaveBackUp(t *testing.T) {
+	logger, _ := l.NewZapLogger(zap.InfoLevel)
+	ms := NewMetricsStorage(logger)
+
+	tmpfile, err := os.CreateTemp("", "metrics_backup_test_*.json")
+	require.NoError(t, err)
+	defer os.Remove(tmpfile.Name())
+
+	gaugeValue := float64(123.45)
+	_, err = ms.SetGauge(context.Background(), m.Metrics{
+		ID:    "test_gauge",
+		MType: "gauge",
+		Value: &gaugeValue,
+	})
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go ms.PeriodicallySaveBackUp(ctx, tmpfile.Name(), false, 100*time.Millisecond)
+
+	time.Sleep(150 * time.Millisecond)
+
+	cancel()
+
+	data, err := os.ReadFile(tmpfile.Name())
+	require.NoError(t, err)
+	assert.NotEmpty(t, data)
+
+	var metrics map[string]m.Metrics
+	err = json.Unmarshal(data, &metrics)
+	require.NoError(t, err)
+
+	gauge, ok := metrics["test_gauge"]
+	assert.True(t, ok)
+	assert.Equal(t, "gauge", gauge.MType)
+	assert.Equal(t, gaugeValue, *gauge.Value)
+}
+
+func TestPeriodicallySaveBackUpRestore(t *testing.T) {
+	logger, _ := l.NewZapLogger(zap.InfoLevel)
+	ms := NewMetricsStorage(logger)
+
+	tmpfile, err := os.CreateTemp("", "metrics_restore_test_*.json")
+	require.NoError(t, err)
+	defer os.Remove(tmpfile.Name())
+
+	gaugeValue := float64(42.5)
+	_, err = ms.SetGauge(context.Background(), m.Metrics{
+		ID:    "gauge1",
+		MType: "gauge",
+		Value: &gaugeValue,
+	})
+	require.NoError(t, err)
+
+	err = ms.SaveToFile(tmpfile.Name())
+	require.NoError(t, err)
+
+	newMS := NewMetricsStorage(logger)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go newMS.PeriodicallySaveBackUp(ctx, tmpfile.Name(), true, 100*time.Millisecond)
+
+	time.Sleep(150 * time.Millisecond)
+
+	gauge, ok := newMS.GetMetrics(context.Background(), "gauge", "gauge1")
+	assert.True(t, ok)
+	assert.Equal(t, "gauge", gauge.MType)
+	assert.Equal(t, gaugeValue, *gauge.Value)
 }

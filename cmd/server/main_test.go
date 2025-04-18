@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -123,4 +124,79 @@ func TestGzipCompression(t *testing.T) {
 
 		require.JSONEq(t, successBody, string(decompressedBody))
 	})
+}
+
+func TestPrintBuildInfo(t *testing.T) {
+	originalBuildVersion := buildVersion
+	originalBuildDate := buildDate
+	originalBuildCommit := buildCommit
+
+	defer func() {
+		buildVersion = originalBuildVersion
+		buildDate = originalBuildDate
+		buildCommit = originalBuildCommit
+	}()
+
+	buildVersion = "test-version"
+	buildDate = "test-date"
+	buildCommit = "test-commit"
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	defer func() {
+		os.Stdout = oldStdout
+	}()
+
+	printBuildInfo()
+
+	w.Close()
+	out, _ := io.ReadAll(r)
+	output := string(out)
+
+	require.Contains(t, output, "Build version: test-version")
+	require.Contains(t, output, "Build date: test-date")
+	require.Contains(t, output, "Build commit: test-commit")
+
+	buildVersion = ""
+	buildDate = ""
+	buildCommit = ""
+
+	r, w, _ = os.Pipe()
+	os.Stdout = w
+
+	printBuildInfo()
+
+	w.Close()
+	out, _ = io.ReadAll(r)
+	output = string(out)
+
+	require.Contains(t, output, "Build version: N/A")
+	require.Contains(t, output, "Build date: N/A")
+	require.Contains(t, output, "Build commit: N/A")
+}
+
+func TestRun_Error(t *testing.T) {
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	defer func() {
+		os.Stderr = oldStderr
+	}()
+
+	errCh := make(chan error, 1)
+	errCh <- io.EOF
+	code := run()
+
+	w.Close()
+	errOut, _ := io.ReadAll(r)
+	errorOutput := string(errOut)
+
+	require.Equal(t, 1, code)
+	require.Contains(t, errorOutput, "critical error:")
 }
