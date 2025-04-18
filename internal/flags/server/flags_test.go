@@ -20,23 +20,23 @@ func TestParseServerFlags(t *testing.T) {
 	defer func() {
 		os.Args = oldArgs
 		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-		_=os.Setenv("ADDRESS", oldAddr)
-		_=os.Setenv("STORE_INTERVAL", oldStoreInterval)
-		_=os.Setenv("FILE_STORAGE_PATH", oldFilePath)
-		_=os.Setenv("RESTORE", oldRestore)
-		_=os.Setenv("DATABASE_DSN", oldDBPath)
-		_=os.Setenv("KEY", oldKey)
+		_ = os.Setenv("ADDRESS", oldAddr)
+		_ = os.Setenv("STORE_INTERVAL", oldStoreInterval)
+		_ = os.Setenv("FILE_STORAGE_PATH", oldFilePath)
+		_ = os.Setenv("RESTORE", oldRestore)
+		_ = os.Setenv("DATABASE_DSN", oldDBPath)
+		_ = os.Setenv("KEY", oldKey)
 	}()
 
 	t.Run("default values", func(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ExitOnError)
 		os.Args = []string{"test"}
-		_=os.Unsetenv("ADDRESS")
-		_=os.Unsetenv("STORE_INTERVAL")
-		_=os.Unsetenv("FILE_STORAGE_PATH")
-		_=os.Unsetenv("RESTORE")
-		_=os.Unsetenv("DATABASE_DSN")
-		_=os.Unsetenv("KEY")
+		_ = os.Unsetenv("ADDRESS")
+		_ = os.Unsetenv("STORE_INTERVAL")
+		_ = os.Unsetenv("FILE_STORAGE_PATH")
+		_ = os.Unsetenv("RESTORE")
+		_ = os.Unsetenv("DATABASE_DSN")
+		_ = os.Unsetenv("KEY")
 
 		opt := ParseServerFlags()
 		assert.Equal(t, ":8080", opt.FlagRunAddr)
@@ -52,12 +52,12 @@ func TestParseServerFlags(t *testing.T) {
 	t.Run("command line flags", func(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ExitOnError)
 		os.Args = []string{"test", "-a", ":9090", "-i", "120", "-f", "custom.json", "-r=false", "-d", "postgres://test", "-k", "testkey"}
-		_=os.Unsetenv("ADDRESS")
-		_=os.Unsetenv("STORE_INTERVAL")
-		_=os.Unsetenv("FILE_STORAGE_PATH")
-		_=os.Unsetenv("RESTORE")
-		_=os.Unsetenv("DATABASE_DSN")
-		_=os.Unsetenv("KEY")
+		_ = os.Unsetenv("ADDRESS")
+		_ = os.Unsetenv("STORE_INTERVAL")
+		_ = os.Unsetenv("FILE_STORAGE_PATH")
+		_ = os.Unsetenv("RESTORE")
+		_ = os.Unsetenv("DATABASE_DSN")
+		_ = os.Unsetenv("KEY")
 
 		opt := ParseServerFlags()
 		assert.Equal(t, ":9090", opt.FlagRunAddr)
@@ -72,12 +72,12 @@ func TestParseServerFlags(t *testing.T) {
 	t.Run("environment variables", func(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ExitOnError)
 		os.Args = []string{"test"}
-		_=os.Setenv("ADDRESS", ":7070")
-		_=os.Setenv("STORE_INTERVAL", "180")
-		_=os.Setenv("FILE_STORAGE_PATH", "env.json")
-		_=os.Setenv("RESTORE", "false")
-		_=os.Setenv("DATABASE_DSN", "postgres://env")
-		_=os.Setenv("KEY", "envkey")
+		_ = os.Setenv("ADDRESS", ":7070")
+		_ = os.Setenv("STORE_INTERVAL", "180")
+		_ = os.Setenv("FILE_STORAGE_PATH", "env.json")
+		_ = os.Setenv("RESTORE", "false")
+		_ = os.Setenv("DATABASE_DSN", "postgres://env")
+		_ = os.Setenv("KEY", "envkey")
 
 		opt := ParseServerFlags()
 		assert.Equal(t, ":7070", opt.FlagRunAddr)
@@ -92,12 +92,12 @@ func TestParseServerFlags(t *testing.T) {
 	t.Run("env overrides flags", func(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ExitOnError)
 		os.Args = []string{"test", "-a", ":9090", "-i", "120", "-f", "custom.json", "-r=false", "-d", "postgres://test", "-k", "testkey"}
-		_=os.Setenv("ADDRESS", ":7070")
-		_=os.Setenv("STORE_INTERVAL", "180")
-		_=os.Setenv("FILE_STORAGE_PATH", "env.json")
-		_=os.Setenv("RESTORE", "true")
-		_=os.Setenv("DATABASE_DSN", "postgres://env")
-		_=os.Setenv("KEY", "envkey")
+		_ = os.Setenv("ADDRESS", ":7070")
+		_ = os.Setenv("STORE_INTERVAL", "180")
+		_ = os.Setenv("FILE_STORAGE_PATH", "env.json")
+		_ = os.Setenv("RESTORE", "true")
+		_ = os.Setenv("DATABASE_DSN", "postgres://env")
+		_ = os.Setenv("KEY", "envkey")
 
 		opt := ParseServerFlags()
 		assert.Equal(t, ":7070", opt.FlagRunAddr)
@@ -112,12 +112,12 @@ func TestParseServerFlags(t *testing.T) {
 	t.Run("database connection test", func(t *testing.T) {
 		flag.CommandLine = flag.NewFlagSet("test", flag.ExitOnError)
 		os.Args = []string{"test"}
-		_=os.Unsetenv("ADDRESS")
-		_=os.Unsetenv("STORE_INTERVAL")
-		_=os.Unsetenv("FILE_STORAGE_PATH")
-		_=os.Unsetenv("RESTORE")
-		_=os.Unsetenv("DATABASE_DSN")
-		_=os.Unsetenv("KEY")
+		_ = os.Unsetenv("ADDRESS")
+		_ = os.Unsetenv("STORE_INTERVAL")
+		_ = os.Unsetenv("FILE_STORAGE_PATH")
+		_ = os.Unsetenv("RESTORE")
+		_ = os.Unsetenv("DATABASE_DSN")
+		_ = os.Unsetenv("KEY")
 
 		assert.Equal(t, "host=localhost port=5432 user=postgres password=admin dbname=MetricStore sslmode=disable", initDefaulthPathDB())
 	})

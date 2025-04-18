@@ -5,12 +5,14 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/rsa"
 	"io"
 	"net/http"
 	"os"
 
 	"go.uber.org/zap"
 
+	"github.com/sanek1/metrics-collector/internal/crypto"
 	flags "github.com/sanek1/metrics-collector/internal/flags/agent"
 	"github.com/sanek1/metrics-collector/internal/models"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
@@ -21,20 +23,83 @@ const (
 	maxDecompressedSize = 10 * 1024 * 1024 // 10 MB
 )
 
+// EncryptFunc - тип функции для шифрования данных
+type EncryptFunc func(ctx context.Context, data []byte) ([]byte, error)
+
 type Services struct {
-	options *flags.Options
-	l       *l.ZapLogger
+	options    *flags.Options
+	l          *l.ZapLogger
+	publicKey  *rsa.PublicKey
+	useEncrypt bool
+	// encryptData - функция шифрования данных, может быть заменена в тестах
+	encryptData EncryptFunc
 }
 
+// NewServices создает новый экземпляр Services
+// Возвращает *Services и ошибку, если не удалось загрузить ключ
 func NewServices(options *flags.Options, zl *l.ZapLogger) *Services {
-	return &Services{
-		options: options,
-		l:       zl,
+	var publicKey *rsa.PublicKey
+	useEncrypt := false
+
+	s := &Services{
+		options:    options,
+		l:          zl,
+		publicKey:  nil,
+		useEncrypt: false,
 	}
+
+	// Загружаем публичный ключ, если указан путь
+	if options.CryptoKey != "" {
+		var err error
+		publicKey, err = crypto.LoadPublicKey(options.CryptoKey)
+		if err != nil {
+			zl.ErrorCtx(context.Background(), "Failed to load public key", zap.Error(err))
+			// Возвращаем сервис без шифрования в случае ошибки
+			s.encryptData = s.defaultEncryptData
+			return s
+		}
+		useEncrypt = true
+		zl.InfoCtx(context.Background(), "Public key loaded successfully, encryption enabled")
+
+		// Обновляем поля после успешной загрузки ключа
+		s.publicKey = publicKey
+		s.useEncrypt = useEncrypt
+	}
+
+	// Устанавливаем функцию шифрования по умолчанию
+	s.encryptData = s.defaultEncryptData
+
+	return s
+}
+
+// defaultEncryptData - стандартная реализация шифрования данных
+func (s Services) defaultEncryptData(ctx context.Context, data []byte) ([]byte, error) {
+	if !s.useEncrypt || s.publicKey == nil {
+		return data, nil
+	}
+
+	encrypted, err := crypto.EncryptData(s.publicKey, data)
+	if err != nil {
+		s.l.ErrorCtx(ctx, "Error encrypting data", zap.Error(err))
+		return nil, err
+	}
+
+	s.l.InfoCtx(ctx, "Data encrypted successfully", zap.Int("encrypted_size", len(encrypted)))
+	return encrypted, nil
 }
 
 func (s Services) preparingMetrics(ctx context.Context, url string, body []byte) (*http.Request, error) {
-	compressedBody, err := s.compressedBody(ctx, body)
+	var processedBody []byte
+	var err error
+
+	// Шифруем данные, если публичный ключ доступен
+	processedBody, err = s.encryptData(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+
+	// Сжимаем данные
+	compressedBody, err := s.compressedBody(ctx, processedBody)
 	if err != nil {
 		s.l.WarnCtx(ctx, "Error compressing request body", zap.Error(err))
 		return nil, err
@@ -49,6 +114,12 @@ func (s Services) preparingMetrics(ctx context.Context, url string, body []byte)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("content-encoding", "gzip")
 	req.Header.Set("Accept-Encoding", "gzip")
+
+	// Добавляем заголовок, указывающий что данные зашифрованы
+	if s.useEncrypt {
+		req.Header.Set("X-Encrypted", "true")
+	}
+
 	return req, nil
 }
 

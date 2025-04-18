@@ -48,6 +48,7 @@ func ParseServerFlags() *ServerOptions {
 	flag.BoolVar(&opt.Restore, "r", defaultRestore, "address and port to run server")
 	flag.StringVar(&opt.DBPath, "d", defaultPathDB, "address and port to run server")
 	flag.StringVar(&opt.CryptoKey, "k", "", "key to encrypt/decrypt metrics")
+	flag.StringVar(&opt.CryptoKey, "crypto-key", "", "path to private key file for decryption")
 
 	flag.Parse()
 	if len(flag.Args()) > 0 {
@@ -83,6 +84,10 @@ func ParseServerFlags() *ServerOptions {
 
 	if key := os.Getenv("KEY"); key != "" {
 		opt.CryptoKey = key
+	}
+
+	if path := os.Getenv("CRYPTO_KEY"); path != "" {
+		opt.CryptoKey = path
 	}
 
 	return opt

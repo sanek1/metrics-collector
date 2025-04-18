@@ -36,9 +36,16 @@ type Storage struct {
 // Возвращает:
 //   - указатель на новый экземпляр Storage
 func NewStorage(s storage.Storage, zl *l.ZapLogger) *Storage {
-	hs := NewHandlerServices(s, nil, zl)
+	hs := NewHandlerServices(s, nil, "", zl)
 
 	return &Storage{Storage: s, Logger: zl, handlerServices: hs}
+}
+
+// SetHandlerServices устанавливает пользовательский сервис обработчиков.
+// Параметры:
+//   - hs: сервис обработчиков
+func (s *Storage) SetHandlerServices(hs *Services) {
+	s.handlerServices = hs
 }
 
 // MainPageHandler обрабатывает запрос к главной странице, отображая все доступные метрики.

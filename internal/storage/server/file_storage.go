@@ -28,8 +28,7 @@ func (ms *MetricsStorage) LoadFromFile(filename string) error {
 	content, err := os.ReadFile(filename)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Println("Data file not found. Let's start with empty values.")
-			return nil
+			return fmt.Errorf("data file not found: %v", err)
 		}
 		return fmt.Errorf("file read error: %v", err)
 	}
