@@ -1,3 +1,4 @@
+// Package logging преставляет собой библиотеку логирования.
 package logging
 
 import (

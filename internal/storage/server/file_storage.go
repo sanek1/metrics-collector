@@ -1,3 +1,4 @@
+// Package storage представляет собой библиотеку хранилища метрик
 package storage
 
 import (
@@ -45,30 +46,29 @@ func (ms *MetricsStorage) LoadFromFile(filename string) error {
 func (ms *MetricsStorage) PeriodicallySaveBackUp(ctx context.Context, filename string, restore bool, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+
 	if restore {
 		err := ms.LoadFromFile(filename)
 		if err != nil {
 			ms.Logger.ErrorCtx(ctx, "Error loading metrics from file")
 		}
 	}
-
-	for range ticker.C {
-		err := ms.SaveToFile(filename)
+	err := ms.SaveToFile(filename)
+	if err != nil {
+		ms.Logger.ErrorCtx(ctx, "Error saving metrics to file: "+err.Error())
+	} else {
 		ms.Logger.InfoCtx(ctx, "saving to file was successful")
-		if err != nil {
-			ms.Logger.ErrorCtx(ctx, "Error saving metrics to file"+err.Error())
-		}
 	}
 
 	for {
 		select {
 		case <-ticker.C:
 			err := ms.SaveToFile(filename)
-			ms.Logger.InfoCtx(ctx, "saving to file was successful")
 			if err != nil {
-				ms.Logger.ErrorCtx(ctx, "Error saving metrics to file"+err.Error())
+				ms.Logger.ErrorCtx(ctx, "Error saving metrics to file: "+err.Error())
+			} else {
+				ms.Logger.InfoCtx(ctx, "saving to file was successful")
 			}
-
 		case <-ctx.Done():
 			ms.Logger.InfoCtx(ctx, "Backup process stopped.")
 			return

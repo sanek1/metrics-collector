@@ -59,17 +59,24 @@ func (s Services) processingResponseServer(ctx context.Context, resp *http.Respo
 			s.l.ErrorCtx(ctx, "Error decompressing response body", zap.Error(err))
 			return err
 		}
-		os.Stdout.Write(buf.Bytes())
+		_, err = os.Stdout.Write(buf.Bytes())
+		if err != nil {
+			s.l.ErrorCtx(ctx, "Error writing response body", zap.Error(err))
+		}
 	} else {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			s.l.ErrorCtx(ctx, "Error reading response body", zap.Error(err))
 			return err
 		}
-		os.Stdout.Write(body)
+		_, err = os.Stdout.Write(body)
+		if err != nil {
+			s.l.ErrorCtx(ctx, "Error writing response body", zap.Error(err))
+		}
 	}
-
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
 		s.l.ErrorCtx(ctx, "Error discarding response body", zap.Error(err))
@@ -96,7 +103,9 @@ func (s Services) decompressBody(ctx context.Context, body io.ReadCloser) (*byte
 	if err != nil {
 		s.l.FatalCtx(ctx, "Error reading response body", zap.Error(err))
 	}
-	defer gzReader.Close()
+	defer func() {
+		_ = gzReader.Close()
+	}()
 
 	buf := new(bytes.Buffer)
 	writer := bufio.NewWriter(buf)

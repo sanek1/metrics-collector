@@ -1,0 +1,60 @@
+name: staticlint analysis
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  staticlint:
+    name: Static Code Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container: golang:1.23
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          go mod download
+          go mod tidy
+
+      - name: Configure Git safe directory
+        run: |
+          git config --global --add safe.directory "$(pwd)"
+
+      - name: Build and run staticlint analyzer
+        id: staticlint
+        run: |
+          echo "::group::Building staticlint analyzer"
+          go build -buildvcs=false -v -o staticlint ./cmd/staticlint
+          echo "::endgroup::"
+          
+          echo "::group::Running staticlint analysis"
+          # created a list of files to analyze
+          find . -path "*/\.git/*" -prune -o -path "*/go-build/*" -prune -o -path "*/vendor/*" -prune -o -name "*.go" -print > gofiles.txt
+          
+          # run staticlint analysis
+          echo "Running full staticlint analysis..."
+          ./staticlint -- @gofiles.txt || true
+          
+          # run only staticlint 
+          echo "Running exitchecker analysis..."
+          ./staticlint -exitchecker -- @gofiles.txt || true
+          echo "::endgroup::"
+          
+      - name: Run tests for static analyzer
+        run: |
+          echo "::group::Running tests for static analyzer"
+          go test -v -coverprofile=staticlint-coverage.out ./cmd/staticlint/...
+          go tool cover -func=staticlint-coverage.out
+          echo "::endgroup::"
+          
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: staticlint-coverage
+          path: staticlint-coverage.out 

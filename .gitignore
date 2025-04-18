@@ -33,3 +33,6 @@ vendor/
 /BACKUP
 /profiles_new
 /profilesnew
+/.github/workflows/build.yml
+/.github/workflows/build.yml
+build.yml

@@ -1,3 +1,4 @@
+// Package validation представляет собой библиотеку валидации метрик
 package validation
 
 import (
