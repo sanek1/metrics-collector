@@ -306,7 +306,6 @@ func TestNewWithCustomLogger(t *testing.T) {
 
 	// Создаем приложение с кастомным логгером
 	app := &App{
-		controller: nil,
 		opt:        opt,
 		logger:     customLogger,
 	}
