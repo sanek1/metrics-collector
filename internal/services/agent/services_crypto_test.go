@@ -1,7 +1,9 @@
 package services
 
 import (
+	"compress/gzip"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -215,10 +217,23 @@ func TestEncryptionWithInvalidKey(t *testing.T) {
 
 // Test for checking that data encryption is not performed when the key is missing
 func TestEncryptionSkippedWithoutKey(t *testing.T) {
-	// Create test server
 	var requestHeader http.Header
+	var receivedBody []byte
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestHeader = r.Header
+
+		if r.Header.Get("content-encoding") == "gzip" {
+			reader, err := gzip.NewReader(r.Body)
+			if err == nil {
+				body, _ := io.ReadAll(reader)
+				receivedBody = body
+				_ = reader.Close()
+			}
+		} else {
+			body, _ := io.ReadAll(r.Body)
+			receivedBody = body
+		}
+
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -236,33 +251,45 @@ func TestEncryptionSkippedWithoutKey(t *testing.T) {
 	options := &flags.Options{
 		CryptoKey: "", // Do not specify the encryption key
 	}
-	service := NewServices(options, zl)
 
-	// Variable to track the call of the encryption function
-	encryptionPerformed := false
-	origEncryptData := service.encryptData
+	var encryptionAttempted bool
+	var dataPassedToEncryption []byte
 
-	// Replace the encryption function with a test function
-	service.encryptData = func(ctx context.Context, data []byte) ([]byte, error) {
-		// Mark that the function was called
-		encryptionPerformed = true
-		// Call the original function, which should return the data without encryption
-		return origEncryptData(ctx, data)
+	mockEncrypt := func(ctx context.Context, data []byte) ([]byte, error) {
+		encryptionAttempted = true
+		dataPassedToEncryption = make([]byte, len(data))
+		copy(dataPassedToEncryption, data)
+		return data, nil
 	}
-	defer func() {
-		service.encryptData = origEncryptData
-	}()
 
-	// Send metric to test server
+	service := NewServices(options, zl)
+	service.encryptData = mockEncrypt
+	assert.False(t, service.useEncrypt, "The useEncrypt flag should be false")
+
 	err := service.SendToServerMetric(context.Background(), server.Client(), server.URL, testMetric)
 	require.NoError(t, err, "Error sending metric")
 
-	// Check that the useEncrypt flag is not set
-	assert.False(t, service.useEncrypt, "The useEncrypt flag should be false")
+	assert.True(t, encryptionAttempted, "The encryption function should be called")
 
-	// Check that encryption was called, but not actually performed
-	assert.True(t, encryptionPerformed, "The encryption function should be called")
+	var passedMetric models.Metrics
+	err = json.Unmarshal(dataPassedToEncryption, &passedMetric)
+	if assert.NoError(t, err, "Error unmarshaling data passed to encryption") {
+		assert.Equal(t, testMetric.ID, passedMetric.ID, "The ID passed to encryption should match")
+		assert.Equal(t, testMetric.MType, passedMetric.MType, "The type passed to encryption should match")
+		assert.Equal(t, *testMetric.Value, *passedMetric.Value, "The value passed to encryption should match")
+	}
 
-	// Check that the X-Encrypted header is not set
 	assert.Empty(t, requestHeader.Get("X-Encrypted"), "The X-Encrypted header should not be set")
+
+	if len(receivedBody) > 0 {
+		var receivedMetric models.Metrics
+		err = json.Unmarshal(receivedBody, &receivedMetric)
+		if assert.NoError(t, err, "Error unmarshaling received body") {
+			assert.Equal(t, testMetric.ID, receivedMetric.ID, "The ID in the received body should match")
+			assert.Equal(t, testMetric.MType, receivedMetric.MType, "The type in the received body should match")
+			assert.Equal(t, *testMetric.Value, *receivedMetric.Value, "The value in the received body should match")
+		}
+	} else {
+		t.Log("Received body is empty, skipping body content check")
+	}
 }

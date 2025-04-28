@@ -10,23 +10,19 @@ import (
 )
 
 func TestGenerateKeyPair(t *testing.T) {
-	// Создаем временные пути для ключей
 	tempDir := t.TempDir()
 	privateKeyPath := filepath.Join(tempDir, "test_private.pem")
 	publicKeyPath := filepath.Join(tempDir, "test_public.pem")
 
-	// Непосредственно генерируем ключи, минуя основную функцию main
 	err := crypto.GenerateKeyPair(privateKeyPath, publicKeyPath)
-	require.NoError(t, err, "Ошибка при генерации ключей")
+	require.NoError(t, err, "error generating key pair")
 
-	// Проверяем, что файлы ключей были созданы
 	_, err = os.Stat(privateKeyPath)
-	require.NoError(t, err, "Приватный ключ должен быть создан")
+	require.NoError(t, err, "private key should be created")
 
 	_, err = os.Stat(publicKeyPath)
-	require.NoError(t, err, "Публичный ключ должен быть создан")
+	require.NoError(t, err, "public key should be created")
 
-	// Проверяем перезапись существующих файлов
 	err = crypto.GenerateKeyPair(privateKeyPath, publicKeyPath)
-	require.NoError(t, err, "Ошибка при перезаписи ключей")
+	require.NoError(t, err, "error rewriting key pair")
 }

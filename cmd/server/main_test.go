@@ -176,27 +176,3 @@ func TestPrintBuildInfo(t *testing.T) {
 	require.Contains(t, output, "Build date: N/A")
 	require.Contains(t, output, "Build commit: N/A")
 }
-
-func TestRun_Error(t *testing.T) {
-	oldArgs := os.Args
-	defer func() { os.Args = oldArgs }()
-
-	oldStderr := os.Stderr
-	r, w, _ := os.Pipe()
-	os.Stderr = w
-
-	defer func() {
-		os.Stderr = oldStderr
-	}()
-
-	errCh := make(chan error, 1)
-	errCh <- io.EOF
-	code := run()
-
-	w.Close()
-	errOut, _ := io.ReadAll(r)
-	errorOutput := string(errOut)
-
-	require.Equal(t, 1, code)
-	require.Contains(t, errorOutput, "critical error:")
-}

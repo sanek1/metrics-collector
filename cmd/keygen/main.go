@@ -13,34 +13,32 @@ func main() {
 	var privateKeyPath string
 	var publicKeyPath string
 
-	flag.StringVar(&privateKeyPath, "private", "private.pem", "путь для сохранения приватного ключа")
-	flag.StringVar(&publicKeyPath, "public", "public.pem", "путь для сохранения публичного ключа")
+	flag.StringVar(&privateKeyPath, "private", "private.pem", "path to save private key")
+	flag.StringVar(&publicKeyPath, "public", "public.pem", "path to save public key")
 	flag.Parse()
 
-	fmt.Printf("Генерация ключей RSA:\n")
-	fmt.Printf("Приватный ключ будет сохранен в: %s\n", privateKeyPath)
-	fmt.Printf("Публичный ключ будет сохранен в: %s\n", publicKeyPath)
+	fmt.Printf("generation RSA keys:\n")
+	fmt.Printf("private key: %s\n", privateKeyPath)
+	fmt.Printf("public key: %s\n", publicKeyPath)
 
-	// Проверка наличия файлов
 	if _, err := os.Stat(privateKeyPath); err == nil {
-		fmt.Printf("Файл %s уже существует, будет перезаписан\n", privateKeyPath)
+		fmt.Printf("file %s already exists, will be overwritten\n", privateKeyPath)
 	}
 	if _, err := os.Stat(publicKeyPath); err == nil {
-		fmt.Printf("Файл %s уже существует, будет перезаписан\n", publicKeyPath)
+		fmt.Printf("file %s already exists, will be overwritten\n", publicKeyPath)
 	}
 
-	// Генерация ключей
 	if err := crypto.GenerateKeyPair(privateKeyPath, publicKeyPath); err != nil {
-		fmt.Printf("Ошибка при генерации ключей: %v\n", err)
+		fmt.Printf("error generating keys: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Ключи успешно сгенерированы!\n")
-	fmt.Printf("\nИспользование на сервере:\n")
-	fmt.Printf("  Запустите сервер с флагом: -crypto-key=%s\n", privateKeyPath)
-	fmt.Printf("  Или установите переменную окружения: CRYPTO_KEY=%s\n", privateKeyPath)
+	fmt.Printf("keys generated successfully!\n")
+	fmt.Printf("\nusage on server:\n")
+	fmt.Printf("  run server with flag: -crypto-key=%s\n", privateKeyPath)
+	fmt.Printf("  or set environment variable: CRYPTO_KEY=%s\n", privateKeyPath)
 
-	fmt.Printf("\nИспользование на агенте:\n")
-	fmt.Printf("  Запустите агент с флагом: -crypto-key=%s\n", publicKeyPath)
-	fmt.Printf("  Или установите переменную окружения: CRYPTO_KEY=%s\n", publicKeyPath)
+	fmt.Printf("\nusage on agent:\n")
+	fmt.Printf("  run agent with flag: -crypto-key=%s\n", publicKeyPath)
+	fmt.Printf("  or set environment variable: CRYPTO_KEY=%s\n", publicKeyPath)
 }
