@@ -82,15 +82,7 @@ func (a *App) startAgent(ctx context.Context) error {
 			//a.logger.InfoCtx(ctx, "Agent stopped.", zap.String("signal", ctx.Err().Error()))
 			if a.controller != nil && gpMetrics != nil {
 				a.controller.SendingGaugeMetrics(ctx, gpMetrics, client)
-			} else {
-				if a.controller == nil {
-					//a.logger.WarnCtx(ctx, "controller is nil, cannot send final metrics")
-				}
-				if gpMetrics == nil {
-					//a.logger.WarnCtx(ctx, "gpMetrics is nil, nothing to send")
-				}
 			}
-			//a.logger.InfoCtx(ctx, "Agent stopped.")
 			return nil
 		}
 	}
