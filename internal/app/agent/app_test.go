@@ -306,8 +306,8 @@ func TestNewWithCustomLogger(t *testing.T) {
 
 	// Создаем приложение с кастомным логгером
 	app := &App{
-		opt:        opt,
-		logger:     customLogger,
+		opt:    opt,
+		logger: customLogger,
 	}
 
 	// Проверяем, что логгер был установлен

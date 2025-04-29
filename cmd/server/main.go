@@ -19,9 +19,10 @@ var (
 )
 
 const (
-	readTimeout  = 5 * time.Second
-	writeTimeout = 60 * time.Second
-	idleTimeout  = 15 * time.Second
+	readTimeout   = 5 * time.Second
+	writeTimeout  = 60 * time.Second
+	idleTimeout   = 15 * time.Second
+	versionString = "N/A"
 )
 
 // @title Metrics Collector API
@@ -42,24 +43,16 @@ func main() {
 }
 
 func printBuildInfo() {
-	version := buildVersion
-	if version == "" {
-		version = "N/A"
-	}
+	fmt.Printf("Build version: %s\n", defaultIfEmpty(buildVersion, versionString))
+	fmt.Printf("Build date: %s\n", defaultIfEmpty(buildDate, versionString))
+	fmt.Printf("Build commit: %s\n", defaultIfEmpty(buildCommit, versionString))
+}
 
-	date := buildDate
-	if date == "" {
-		date = "N/A"
+func defaultIfEmpty(value, versionString string) string {
+	if value == "" {
+		return versionString
 	}
-
-	commit := buildCommit
-	if commit == "" {
-		commit = "N/A"
-	}
-
-	fmt.Printf("Build version: %s\n", version)
-	fmt.Printf("Build date: %s\n", date)
-	fmt.Printf("Build commit: %s\n", commit)
+	return value
 }
 
 func run() int {

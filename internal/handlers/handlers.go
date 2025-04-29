@@ -215,13 +215,14 @@ func (s Storage) UpdateMetricFromURLHandler(c *gin.Context) {
 // @Failure 400 {object} models.ErrorResponse
 // @Router /update/{type}/{name}/{value} [post]
 func (s Storage) MetricHandler(c *gin.Context) {
-	ctx := context.Background()
-	models, err := s.handlerServices.ParseMetricsServices(c)
-	if err != nil {
-		s.Logger.ErrorCtx(ctx, "MetricHandler The metric was not parsed")
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	//ctx := context.Background()
+	val, exists := c.Get("metrics")
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "metrics not found in context"})
 		return
 	}
+	models := val.([]m.Metrics)
+
 	s.handlerServices.models = &models
 	switch models[0].MType {
 	case m.TypeCounter:

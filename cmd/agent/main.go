@@ -29,24 +29,16 @@ func main() {
 }
 
 func printBuildInfo() {
-	version := buildVersion
-	if version == "" {
-		version = versionString
-	}
+	fmt.Printf("Build version: %s\n", defaultIfEmpty(buildVersion, versionString))
+	fmt.Printf("Build date: %s\n", defaultIfEmpty(buildDate, versionString))
+	fmt.Printf("Build commit: %s\n", defaultIfEmpty(buildCommit, versionString))
+}
 
-	date := buildDate
-	if date == "" {
-		date = versionString
+func defaultIfEmpty(value, defaultValue string) string {
+	if value == "" {
+		return defaultValue
 	}
-
-	commit := buildCommit
-	if commit == "" {
-		commit = versionString
-	}
-
-	fmt.Printf("Build version: %s\n", version)
-	fmt.Printf("Build date: %s\n", date)
-	fmt.Printf("Build commit: %s\n", commit)
+	return value
 }
 
 func run() int {
