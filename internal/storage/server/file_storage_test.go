@@ -176,14 +176,14 @@ func TestSaveAndLoadFromFile(t *testing.T) {
 
 	t.Run("SaveToFileWithError", func(t *testing.T) {
 		invalidPath := filepath.Join(tempDir, "invalid_dir", "file.json")
-		_=os.MkdirAll(filepath.Dir(invalidPath), 0755)
+		_ = os.MkdirAll(filepath.Dir(invalidPath), 0755)
 
 		err := mockFileStorage.SaveToFile(invalidPath)
 		assert.Error(t, err)
 	})
 }
 
-func TestPeriodicallySaveBackUp(t *testing.T) {
+func TestPeriodicallySaveBackUp_WithFileStorage(t *testing.T) {
 	// Создаем временную директорию для теста
 	tempDir := t.TempDir()
 	subDir := filepath.Join(tempDir, "backup") // Используем поддиректорию

@@ -36,9 +36,16 @@ type Storage struct {
 // Возвращает:
 //   - указатель на новый экземпляр Storage
 func NewStorage(s storage.Storage, zl *l.ZapLogger) *Storage {
-	hs := NewHandlerServices(s, nil, zl)
+	hs := NewHandlerServices(s, nil, "", zl)
 
 	return &Storage{Storage: s, Logger: zl, handlerServices: hs}
+}
+
+// SetHandlerServices устанавливает пользовательский сервис обработчиков.
+// Параметры:
+//   - hs: сервис обработчиков
+func (s *Storage) SetHandlerServices(hs *Services) {
+	s.handlerServices = hs
 }
 
 // MainPageHandler обрабатывает запрос к главной странице, отображая все доступные метрики.
@@ -208,13 +215,14 @@ func (s Storage) UpdateMetricFromURLHandler(c *gin.Context) {
 // @Failure 400 {object} models.ErrorResponse
 // @Router /update/{type}/{name}/{value} [post]
 func (s Storage) MetricHandler(c *gin.Context) {
-	ctx := context.Background()
-	models, err := s.handlerServices.ParseMetricsServices(c)
-	if err != nil {
-		s.Logger.ErrorCtx(ctx, "MetricHandler The metric was not parsed")
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	//ctx := context.Background()
+	val, exists := c.Get("metrics")
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "metrics not found in context"})
 		return
 	}
+	models := val.([]m.Metrics)
+
 	s.handlerServices.models = &models
 	switch models[0].MType {
 	case m.TypeCounter:

@@ -4,6 +4,8 @@ package handlers
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
+	"crypto/rsa"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,16 +17,20 @@ import (
 	storage "github.com/sanek1/metrics-collector/internal/storage/server"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
 	"go.uber.org/zap"
+
+	"github.com/sanek1/metrics-collector/internal/crypto"
 )
 
 // Services предоставляет сервисы для обработки метрик.
 // Реализует бизнес-логику для работы с различными типами метрик
 // и обеспечивает взаимодействие между хранилищем и HTTP-обработчиками.
 type Services struct {
-	s       storage.Storage
-	models  *[]m.Metrics
-	logger  *l.ZapLogger
-	hashKey *string
+	s          storage.Storage
+	models     *[]m.Metrics
+	logger     *l.ZapLogger
+	hashKey    *string
+	privateKey *rsa.PrivateKey
+	useDecrypt bool
 }
 
 // HServices определяет интерфейс сервисов обработки метрик.
@@ -50,17 +56,34 @@ type HServices interface {
 // NewHandlerServices создает новый экземпляр сервисов обработки метрик.
 // Параметры:
 //   - st: хранилище метрик
-//   - models: указатель на срез метрик (может быть nil)
+//   - hashKey: ключ для хеширования
+//   - cryptoKeyPath: путь к файлу с приватным ключом
 //   - zl: логгер
 //
 // Возвращает:
 //   - указатель на новый экземпляр Services
-func NewHandlerServices(st storage.Storage, hashKey *string, zl *l.ZapLogger) *Services {
+func NewHandlerServices(st storage.Storage, hashKey *string, cryptoKeyPath string, zl *l.ZapLogger) *Services {
+	var privateKey *rsa.PrivateKey
+	useDecrypt := false
+
+	if cryptoKeyPath != "" {
+		var err error
+		privateKey, err = crypto.LoadPrivateKey(cryptoKeyPath)
+		if err != nil {
+			zl.ErrorCtx(context.Background(), "Failed to load private key, continuing without decryption", zap.Error(err))
+		} else {
+			useDecrypt = true
+			zl.InfoCtx(context.Background(), "Private key loaded successfully, decryption enabled")
+		}
+	}
+
 	return &Services{
-		s:       st,
-		models:  nil,
-		logger:  zl,
-		hashKey: hashKey,
+		s:          st,
+		models:     nil,
+		logger:     zl,
+		hashKey:    hashKey,
+		privateKey: privateKey,
+		useDecrypt: useDecrypt,
 	}
 }
 
@@ -75,6 +98,86 @@ func (s *Services) PingService(c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{})
+}
+
+// ParseMetricsServices разбирает метрики из тела HTTP-запроса.
+// Поддерживает разбор как одиночной метрики, так и массива метрик в формате JSON.
+// Также поддерживает сжатие gzip и шифрование данных.
+//
+// Возвращает:
+//   - срез разобранных метрик
+//   - ошибку, если не удалось разобрать метрики
+func (s *Services) ParseMetricsServices(c *gin.Context) ([]m.Metrics, error) {
+	var models []m.Metrics
+	r := c.Request
+
+	if r.ContentLength == 0 {
+		if err := s.buildJSONBody(c); err != nil {
+			s.logger.ErrorCtx(r.Context(), "The metric was not parsed", zap.Any("err", err.Error()))
+			return nil, fmt.Errorf("buildJSONBody: %w", err)
+		}
+	}
+
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		s.logger.ErrorCtx(r.Context(), "The metric was not read", zap.Any("err", err.Error()))
+		return nil, fmt.Errorf("read body: %w", err)
+	}
+
+	// Проверяем, зашифрованы ли данные
+	isEncrypted := c.GetHeader("X-Encrypted") == "true"
+
+	// Проверяем, сжаты ли данные
+	if c.GetHeader("Content-Encoding") == "gzip" {
+		reader, err := gzip.NewReader(bytes.NewReader(bodyBytes))
+		if err != nil {
+			s.logger.ErrorCtx(r.Context(), "Failed to decompress gzip data", zap.Error(err))
+			return nil, fmt.Errorf("gzip decompression: %w", err)
+		}
+		decompressed, err := io.ReadAll(reader)
+		if err != nil {
+			s.logger.ErrorCtx(r.Context(), "Failed to read decompressed data", zap.Error(err))
+			return nil, fmt.Errorf("read decompressed: %w", err)
+		}
+		bodyBytes = decompressed
+	}
+
+	// Если данные зашифрованы и у нас есть приватный ключ, расшифровываем их
+	if isEncrypted && s.useDecrypt && s.privateKey != nil {
+		decrypted, err := crypto.DecryptData(s.privateKey, bodyBytes)
+		if err != nil {
+			s.logger.ErrorCtx(r.Context(), "Failed to decrypt data", zap.Error(err))
+			return nil, fmt.Errorf("decryption: %w", err)
+		}
+		s.logger.InfoCtx(r.Context(), "Data decrypted successfully", zap.Int("decrypted_size", len(decrypted)))
+		bodyBytes = decrypted
+	} else if isEncrypted && (!s.useDecrypt || s.privateKey == nil) {
+		s.logger.ErrorCtx(r.Context(), "Received encrypted data but no private key available")
+		return nil, fmt.Errorf("no private key available for decryption")
+	}
+
+	var model m.Metrics
+	if err := json.Unmarshal(bodyBytes, &model); err != nil {
+		if err := json.Unmarshal(bodyBytes, &models); err != nil {
+			s.logger.ErrorCtx(r.Context(), "The metric was not parsed"+string(bodyBytes)+err.Error(), zap.Any("err", err.Error()))
+			return nil, fmt.Errorf("unmarshal: %w", err)
+		}
+	}
+	defer func() {
+		_ = r.Body.Close()
+	}()
+
+	if model != (m.Metrics{}) {
+		models = append(models, model)
+	}
+
+	for _, model := range models {
+		if model.MType != m.TypeGauge && model.MType != m.TypeCounter {
+			s.logger.ErrorCtx(r.Context(), "The metric has unsupported type", zap.Any("err", "unsupported request type"))
+			return nil, fmt.Errorf("unsupported request type: %s", model.MType)
+		}
+	}
+	return models, nil
 }
 
 // CounterService обрабатывает запросы для метрик типа counter.
@@ -198,67 +301,6 @@ func (s *Services) CheckValue(metric *m.Metrics) bool {
 	default:
 		return false
 	}
-}
-
-// ParseMetricsServices разбирает метрики из тела HTTP-запроса.
-// Поддерживает разбор как одиночной метрики, так и массива метрик в формате JSON.
-// Также поддерживает сжатие gzip.
-//
-// Возвращает:
-//   - срез разобранных метрик
-//   - ошибку, если не удалось разобрать метрики
-func (s *Services) ParseMetricsServices(c *gin.Context) ([]m.Metrics, error) {
-	var models []m.Metrics
-	r := c.Request
-
-	if r.ContentLength == 0 {
-		if err := s.buildJSONBody(c); err != nil {
-			s.logger.ErrorCtx(r.Context(), "The metric was not parsed", zap.Any("err", err.Error()))
-			return nil, fmt.Errorf("buildJSONBody: %w", err)
-		}
-	}
-
-	bodyBytes, err := io.ReadAll(r.Body)
-	if err != nil {
-		s.logger.ErrorCtx(r.Context(), "The metric was not read", zap.Any("err", err.Error()))
-		return nil, fmt.Errorf("read body: %w", err)
-	}
-	if c.GetHeader("Content-Encoding") == "gzip" {
-		reader, err := gzip.NewReader(bytes.NewReader(bodyBytes))
-		if err != nil {
-			s.logger.ErrorCtx(r.Context(), "Failed to decompress gzip data", zap.Error(err))
-			return nil, fmt.Errorf("gzip decompression: %w", err)
-		}
-		decompressed, err := io.ReadAll(reader)
-		if err != nil {
-			s.logger.ErrorCtx(r.Context(), "Failed to read decompressed data", zap.Error(err))
-			return nil, fmt.Errorf("read decompressed: %w", err)
-		}
-		bodyBytes = decompressed
-	}
-
-	var model m.Metrics
-	if err := json.Unmarshal(bodyBytes, &model); err != nil {
-		if err := json.Unmarshal(bodyBytes, &models); err != nil {
-			s.logger.ErrorCtx(r.Context(), "The metric was not parsed"+string(bodyBytes)+err.Error(), zap.Any("err", err.Error()))
-			return nil, fmt.Errorf("unmarshal: %w", err)
-		}
-	}
-	defer func() {
-		_ = r.Body.Close()
-	}()
-
-	if model != (m.Metrics{}) {
-		models = append(models, model)
-	}
-
-	for _, model := range models {
-		if model.MType != m.TypeGauge && model.MType != m.TypeCounter {
-			s.logger.ErrorCtx(r.Context(), "The metric has unsupported type", zap.Any("err", "unsupported request type"))
-			return nil, fmt.Errorf("unsupported request type: %s", model.MType)
-		}
-	}
-	return models, nil
 }
 
 // GetMetricsByValueGin обрабатывает запрос на получение значения метрики через JSON API.

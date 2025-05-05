@@ -4,6 +4,8 @@ package app
 import (
 	"context"
 	"net/http"
+	"os/signal"
+	"syscall"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -28,7 +30,8 @@ func New(opt *sf.ServerOptions, useDatabase bool) *App {
 }
 
 func (a *App) Run() error {
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stop()
 	l, err := logging.NewZapLogger(zap.InfoLevel)
 	if err != nil {
 		panic(err)
@@ -69,5 +72,17 @@ func (a *App) Run() error {
 	if err != nil {
 		l.FatalCtx(ctx, "Failed to start server", zap.Error(err))
 	}
+
+	<-ctx.Done()
+	l.InfoCtx(ctx, "get signal to stop server")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		l.FatalCtx(ctx, "Failed to shutdown server", zap.Error(err))
+	}
+
+	l.InfoCtx(ctx, "Server gracefully stopped")
+
 	return nil
 }

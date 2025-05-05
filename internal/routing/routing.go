@@ -15,13 +15,14 @@ import (
 )
 
 type Router struct {
-	router         *gin.Engine
-	l              *l.ZapLogger
-	middleware     *v.MiddlewareController
-	middlewareHash *v.Secret
-	storage        ss.Storage
-	s              *h.Storage
-	opt            *sf.ServerOptions
+	router           *gin.Engine
+	l                *l.ZapLogger
+	middleware       *v.MiddlewareController
+	middlewareHash   *v.Secret
+	middlewareParser *v.Parser
+	storage          ss.Storage
+	s                *h.Storage
+	opt              *sf.ServerOptions
 }
 type Routing interface {
 	InitRouting() http.Handler
@@ -35,9 +36,12 @@ func NewRouting(s ss.Storage, opt *sf.ServerOptions, logger *l.ZapLogger) *Route
 		opt:     opt,
 	}
 
+	handlerServices := h.NewHandlerServices(s, &opt.CryptoKey, opt.CryptoKey, logger)
 	c.s = h.NewStorage(s, logger)
+	c.s.SetHandlerServices(handlerServices)
 	c.middleware = v.NewValidation(c.s, logger)
 	c.middlewareHash = v.NewHash(opt.CryptoKey)
+	c.middlewareParser = v.NewParser(handlerServices)
 	return c
 }
 
@@ -74,9 +78,9 @@ func (r *Router) InitRouting() http.Handler {
 		c.Next()
 	})
 
-	r.router.POST("/update/:metricType/:metricName/:metricValue", r.s.MetricHandler)
-	r.router.POST("/updates/", r.s.MetricHandler)
-	r.router.POST("/update/", r.s.MetricHandler)
+	r.router.POST("/update/:metricType/:metricName/:metricValue", r.middlewareParser.HandleMetrics(), r.s.MetricHandler)
+	r.router.POST("/updates/", r.middlewareParser.HandleMetrics(), r.s.MetricHandler)
+	r.router.POST("/update/", r.middlewareParser.HandleMetrics(), r.s.MetricHandler)
 	r.router.POST("/value/", r.s.GetMetricsByValueHandler)
 	r.router.POST("/", gin.WrapF(h.NotImplementedHandler))
 	r.router.GET("/", r.s.MainPageHandler)

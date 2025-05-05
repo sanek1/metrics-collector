@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"go.uber.org/zap"
@@ -36,7 +38,8 @@ func New(opt *af.Options) *App {
 	}
 }
 func (a *App) Run() error {
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stop()
 
 	if err := a.startAgent(ctx); err != nil {
 		a.logger.ErrorCtx(ctx, "Error starting agent", zap.Error(err))
@@ -74,6 +77,13 @@ func (a *App) startAgent(ctx context.Context) error {
 			a.controller.SendingGaugeMetrics(ctx, gpMetrics, client)
 			_, _ = fmt.Fprintf(os.Stdout, "--------- end response ---------\n\n")
 			_, _ = fmt.Fprintf(os.Stdout, "--------- NEW ITERATION %d ---------> \n\n", pollCount)
+
+		case <-ctx.Done():
+			//a.logger.InfoCtx(ctx, "Agent stopped.", zap.String("signal", ctx.Err().Error()))
+			if a.controller != nil && gpMetrics != nil {
+				a.controller.SendingGaugeMetrics(ctx, gpMetrics, client)
+			}
+			return nil
 		}
 	}
 }

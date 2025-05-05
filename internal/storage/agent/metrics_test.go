@@ -70,7 +70,7 @@ func TestGetGopsuiteMetrics(t *testing.T) {
 		assert.GreaterOrEqual(t, value, float64(0), "metric %s should be not negative", metricName)
 	}
 
-	assert.GreaterOrEqual(t, metrics["TotalMemory"], metrics["FreeMemory"],"")
+	assert.GreaterOrEqual(t, metrics["TotalMemory"], metrics["FreeMemory"], "")
 }
 
 func TestMetricsIntegration(t *testing.T) {
