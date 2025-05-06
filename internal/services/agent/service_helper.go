@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"io"
+	"net"
 	"net/http"
 	"os"
 
@@ -114,6 +115,7 @@ func (s Services) preparingMetrics(ctx context.Context, url string, body []byte)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("content-encoding", "gzip")
 	req.Header.Set("Accept-Encoding", "gzip")
+	req.Header.Set("X-Real-IP", getLocalIP())
 
 	// Добавляем заголовок, указывающий что данные зашифрованы
 	if s.useEncrypt {
@@ -121,6 +123,20 @@ func (s Services) preparingMetrics(ctx context.Context, url string, body []byte)
 	}
 
 	return req, nil
+}
+func getLocalIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, addr := range addrs {
+		if ipNet, ok := addr.(*net.IPNet); ok && !ipNet.IP.IsLoopback() {
+			if ip4 := ipNet.IP.To4(); ip4 != nil {
+				return ip4.String()
+			}
+		}
+	}
+	return ""
 }
 
 func (s Services) processingResponseServer(ctx context.Context, resp *http.Response) error {
