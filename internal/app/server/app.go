@@ -46,7 +46,7 @@ func (a *App) Run() error {
 		}
 	}
 
-	if a.options.EnableGRPC == true {
+	if a.options.EnableGRPC {
 		go func() {
 			if err := grpcserver.RunGRPCServer(a.options.GRPCAddress, storage); err != nil {
 				l.ErrorCtx(ctx, "gRPC server failed", zap.Error(err))
