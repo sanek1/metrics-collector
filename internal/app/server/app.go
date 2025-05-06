@@ -13,6 +13,7 @@ import (
 
 	sc "github.com/sanek1/metrics-collector/internal/controller/server"
 	sf "github.com/sanek1/metrics-collector/internal/flags/server"
+	"github.com/sanek1/metrics-collector/internal/grpcserver"
 	ss "github.com/sanek1/metrics-collector/internal/storage/server"
 	"github.com/sanek1/metrics-collector/pkg/logging"
 )
@@ -43,6 +44,14 @@ func (a *App) Run() error {
 		if _, ok := storage.(*ss.DBStorage); !ok {
 			l.ErrorCtx(context.Background(), "Error connecting to database", zap.Error(err))
 		}
+	}
+
+	if a.options.EnableGRPC {
+		go func() {
+			if err := grpcserver.RunGRPCServer(a.options.GRPCAddress, storage); err != nil {
+				l.ErrorCtx(ctx, "gRPC server failed", zap.Error(err))
+			}
+		}()
 	}
 
 	fs := ss.NewMetricsStorage(l)

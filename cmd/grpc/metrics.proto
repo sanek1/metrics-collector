@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package metrics;
+
+option go_package = "/metricsgrpc;metricsgrpc";
+
+message Metric {
+  string ID = 1;
+  string MType = 2;
+  int64 Delta  = 3;
+  double  Value = 4;
+}
+
+message Empty {}
+
+message MetricList {
+  repeated Metric metrics = 1;
+}
+
+service MetricsService {
+  rpc SendMetrics (MetricList) returns (Empty);
+}

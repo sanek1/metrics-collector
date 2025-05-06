@@ -15,6 +15,8 @@ import (
 
 	ac "github.com/sanek1/metrics-collector/internal/controller/agent"
 	af "github.com/sanek1/metrics-collector/internal/flags/agent"
+	"github.com/sanek1/metrics-collector/internal/grpcclient"
+	m "github.com/sanek1/metrics-collector/internal/models"
 	as "github.com/sanek1/metrics-collector/internal/storage/agent"
 	l "github.com/sanek1/metrics-collector/pkg/logging"
 )
@@ -27,14 +29,25 @@ type App struct {
 	controller *ac.Controller
 	opt        *af.Options
 	logger     *l.ZapLogger
+	grpcClient *grpcclient.Client
 }
 
 func New(opt *af.Options) *App {
+	grpcClient := &grpcclient.Client{}
+	var err error
 	logger := startLogger()
+	if opt.EnableGRPC {
+		grpcClient, err = grpcclient.New("localhost:8080")
+		if err != nil {
+			log.Panicf("Failed to create gRPC client: %v", err)
+		}
+	}
+
 	ctrl := ac.NewController(opt, logger)
 	return &App{
 		controller: ctrl,
 		opt:        opt,
+		grpcClient: grpcClient,
 	}
 }
 func (a *App) Run() error {
@@ -72,14 +85,29 @@ func (a *App) startAgent(ctx context.Context) error {
 			as.GetGopsuiteMetrics(gpMetrics)
 		case <-reportTick.C:
 			_, _ = fmt.Fprintf(os.Stdout, "--------- start response ---------\n\n")
-			a.controller.SendingCounterMetrics(ctx, &pollCount, client)
-			a.controller.SendingGaugeMetrics(ctx, metrics, client)
-			a.controller.SendingGaugeMetrics(ctx, gpMetrics, client)
+			if a.opt.EnableGRPC {
+				// Отправляем метрики по gRPC
+				metricGauges := m.NewArrMetricGauge(metrics)
+				metricgp := m.NewArrMetricGauge(gpMetrics)
+				grpcMetrics := grpcclient.ConvertToGRPC(metricGauges)
+				grpcGP := grpcclient.ConvertToGRPC(metricgp)
+
+				if err := a.grpcClient.SendMetrics(ctx, grpcMetrics); err != nil {
+					a.logger.ErrorCtx(ctx, "Failed to send counter metrics via gRPC", zap.Error(err))
+				}
+				if err := a.grpcClient.SendMetrics(ctx, grpcGP); err != nil {
+					a.logger.ErrorCtx(ctx, "Failed to send gauge metrics via gRPC", zap.Error(err))
+				}
+			} else {
+				// Отправляем метрики по HTTP
+				a.controller.SendingCounterMetrics(ctx, &pollCount, client)
+				a.controller.SendingGaugeMetrics(ctx, metrics, client)
+				a.controller.SendingGaugeMetrics(ctx, gpMetrics, client)
+			}
 			_, _ = fmt.Fprintf(os.Stdout, "--------- end response ---------\n\n")
 			_, _ = fmt.Fprintf(os.Stdout, "--------- NEW ITERATION %d ---------> \n\n", pollCount)
 
 		case <-ctx.Done():
-			//a.logger.InfoCtx(ctx, "Agent stopped.", zap.String("signal", ctx.Err().Error()))
 			if a.controller != nil && gpMetrics != nil {
 				a.controller.SendingGaugeMetrics(ctx, gpMetrics, client)
 			}
