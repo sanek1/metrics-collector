@@ -19,6 +19,7 @@ type ServerOptions struct {
 	UseDatabase   bool
 	CryptoKey     string
 	ConfigPath    string
+	TrustedSubnet string `json:"trusted_subnet"`
 }
 
 // ServerFileConfig представляет конфигурацию сервера из файла
@@ -120,6 +121,7 @@ func ParseServerFlags() *ServerOptions {
 	flag.StringVar(&opt.CryptoKey, "crypto-key", "", "path to private key file for decryption")
 	flag.StringVar(&opt.ConfigPath, "c", "", "path to config file")
 	flag.StringVar(&opt.ConfigPath, "config", "", "path to config file")
+	flag.StringVar(&opt.TrustedSubnet, "t", "", "Trusted subnet in CIDR format")
 
 	flag.Parse()
 	if len(flag.Args()) > 0 {
@@ -140,6 +142,9 @@ func ParseServerFlags() *ServerOptions {
 		} else {
 			fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
 		}
+	}
+	if sbnt := os.Getenv("TRUSTED_SUBNET"); sbnt != "" {
+		opt.TrustedSubnet = sbnt
 	}
 
 	if addr := os.Getenv("ADDRESS"); addr != "" {

@@ -52,6 +52,7 @@ func (r *Router) InitRouting() http.Handler {
 	r.router.GET("/debug/")
 
 	r.router.Use(v.GzipMiddleware())
+	r.router.Use(v.CheckTrustedSubnetMiddleware(r.opt.TrustedSubnet))
 	r.router.Use(func(c *gin.Context) {
 		if c.Request.Method == "POST" && c.FullPath() == "/update/:metricType/:metricName/:metricValue" {
 			metricType := c.Param("metricType")
