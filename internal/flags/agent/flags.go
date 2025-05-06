@@ -17,6 +17,8 @@ type Options struct {
 	PollInterval   int64
 	RateLimit      int64
 	ConfigPath     string
+	EnableGRPC     bool   `json:"enable_grpc"`
+	GRPCAddress    string `json:"grpc_address"`
 }
 
 // AgentFileConfig представляет конфигурацию агента из файла
@@ -97,6 +99,7 @@ func ParseFlags() *Options {
 	flag.StringVar(&opt.CryptoKey, "crypto-key", "", "path to public key file for encryption")
 	flag.StringVar(&opt.ConfigPath, "c", "", "path to config file")
 	flag.StringVar(&opt.ConfigPath, "config", "", "path to config file")
+	flag.StringVar(&opt.GRPCAddress, "g", "localhost:8080", "path to config file")
 	flag.Parse()
 
 	if len(flag.Args()) > 0 {

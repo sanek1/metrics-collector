@@ -20,6 +20,8 @@ type ServerOptions struct {
 	CryptoKey     string
 	ConfigPath    string
 	TrustedSubnet string `json:"trusted_subnet"`
+	EnableGRPC    bool   `json:"enable_grpc"`
+	GRPCAddress   string `json:"grpc_address"`
 }
 
 // ServerFileConfig представляет конфигурацию сервера из файла
