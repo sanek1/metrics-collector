@@ -2,7 +2,6 @@ package grpcclient
 
 import (
 	"context"
-	"time"
 
 	"github.com/sanek1/metrics-collector/cmd/grpc/metricsgrpc"
 	m "github.com/sanek1/metrics-collector/internal/models"
@@ -18,9 +17,7 @@ type Client struct {
 func New(address string) (*Client, error) {
 	conn, err := grpc.Dial(
 		address,
-		grpc.WithTransportCredentials(insecure.NewCredentials()), // Замена устаревшего WithInsecure
-		grpc.WithBlock(),
-		grpc.WithTimeout(5*time.Second),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
 		return nil, err
