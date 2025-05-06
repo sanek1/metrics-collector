@@ -15,13 +15,14 @@ type Client struct {
 }
 
 func New(address string) (*Client, error) {
-	conn, err := grpc.Dial(
+	conn, err := grpc.NewClient(
 		address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
 		return nil, err
 	}
+
 	client := metricsgrpc.NewMetricsServiceClient(conn)
 	return &Client{conn: conn, client: client}, nil
 }
